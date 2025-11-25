@@ -35,6 +35,7 @@ const StudentWorkspace = () => {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
   const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null);
+  const [isInvalidCode, setIsInvalidCode] = useState(false);
   const [text, setText] = useState("");
   const [wordCount, setWordCount] = useState(0);
   const [feedbackTokens, setFeedbackTokens] = useState(3);
@@ -43,13 +44,25 @@ const StudentWorkspace = () => {
   const [hasDownloaded, setHasDownloaded] = useState(false);
 
   useEffect(() => {
-    if (code) {
-      const storedData = localStorage.getItem(`assignment_${code}`);
-      if (storedData) {
-        setAssignmentData(JSON.parse(storedData));
-      } else {
-        toast.error("Opdracht niet gevonden");
+    if (!code) {
+      setIsInvalidCode(true);
+      return;
+    }
+    
+    const storedData = localStorage.getItem(`assignment_${code}`);
+    if (storedData) {
+      try {
+        const parsedData = JSON.parse(storedData);
+        setAssignmentData(parsedData);
+        setIsInvalidCode(false);
+      } catch (error) {
+        console.error("Error parsing assignment data:", error);
+        setIsInvalidCode(true);
+        toast.error("Ongeldige opdrachtdata");
       }
+    } else {
+      setIsInvalidCode(true);
+      toast.error("Deze link is ongeldig of verlopen");
     }
   }, [code]);
 
@@ -132,6 +145,29 @@ const StudentWorkspace = () => {
   };
 
   const wordProgress = (wordCount / 1000) * 100;
+
+  if (isInvalidCode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8 flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Link ongeldig
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Deze link is ongeldig of verlopen. Vraag je docent om een nieuwe link.
+            </p>
+            <Button onClick={() => navigate("/")} className="w-full">
+              Terug naar home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8">
