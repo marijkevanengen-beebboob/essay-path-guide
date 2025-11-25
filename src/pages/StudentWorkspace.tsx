@@ -44,15 +44,24 @@ const StudentWorkspace = () => {
   const [hasDownloaded, setHasDownloaded] = useState(false);
 
   useEffect(() => {
+    console.log("StudentWorkspace - Code from URL:", code);
+    console.log("StudentWorkspace - All localStorage keys:", Object.keys(localStorage));
+    
     if (!code) {
+      console.log("StudentWorkspace - No code provided");
       setIsInvalidCode(true);
       return;
     }
     
-    const storedData = localStorage.getItem(`assignment_${code}`);
+    const key = `assignment_${code}`;
+    console.log("StudentWorkspace - Looking for key:", key);
+    const storedData = localStorage.getItem(key);
+    console.log("StudentWorkspace - Stored data:", storedData);
+    
     if (storedData) {
       try {
         const parsedData = JSON.parse(storedData);
+        console.log("StudentWorkspace - Parsed data:", parsedData);
         setAssignmentData(parsedData);
         setIsInvalidCode(false);
       } catch (error) {
@@ -61,6 +70,7 @@ const StudentWorkspace = () => {
         toast.error("Ongeldige opdrachtdata");
       }
     } else {
+      console.log("StudentWorkspace - No data found for key:", key);
       setIsInvalidCode(true);
       toast.error("Deze link is ongeldig of verlopen");
     }

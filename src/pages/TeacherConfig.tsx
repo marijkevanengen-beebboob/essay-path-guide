@@ -118,7 +118,11 @@ const TeacherConfig = () => {
           isCustom: c.isCustom
         }))
       };
-      localStorage.setItem(`assignment_${code}`, JSON.stringify(assignmentData));
+      const key = `assignment_${code}`;
+      console.log("TeacherConfig - Storing with key:", key);
+      console.log("TeacherConfig - Assignment data:", assignmentData);
+      localStorage.setItem(key, JSON.stringify(assignmentData));
+      console.log("TeacherConfig - Verification - Data stored:", localStorage.getItem(key));
       
       return `${window.location.origin}/student/${code}`;
     });
