@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Copy, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getCriteriaForLevel, masterCriteria } from "@/data/masterCriteria";
@@ -29,6 +29,8 @@ const TeacherConfig = () => {
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [customCriterion, setCustomCriterion] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [generatedLinks, setGeneratedLinks] = useState<string[]>([]);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const handleAnalyze = async () => {
     if (!level || !assignmentText) {
@@ -100,8 +102,27 @@ const TeacherConfig = () => {
       return;
     }
 
-    // In production, this would generate actual unique URLs
+    // Generate unique codes for each student
+    const links = Array.from({ length: count }, (_, i) => {
+      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+      return `${window.location.origin}/student/${code}`;
+    });
+    
+    setGeneratedLinks(links);
     toast.success(`${count} unieke links gegenereerd!`);
+  };
+
+  const copyToClipboard = (link: string, index: number) => {
+    navigator.clipboard.writeText(link);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+    toast.success("Link gekopieerd naar klembord");
+  };
+
+  const copyAllLinks = () => {
+    const allLinks = generatedLinks.join('\n');
+    navigator.clipboard.writeText(allLinks);
+    toast.success("Alle links gekopieerd naar klembord");
   };
 
   return (
@@ -251,6 +272,45 @@ const TeacherConfig = () => {
                 <Button onClick={generateLinks} className="w-full md:w-auto" size="lg">
                   Genereer {studentCount || "X"} Unieke Links
                 </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {generatedLinks.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gegenereerde Links</CardTitle>
+                    <CardDescription>Deel deze unieke links met je leerlingen</CardDescription>
+                  </div>
+                  <Button variant="outline" onClick={copyAllLinks}>
+                    Kopieer Alles
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {generatedLinks.map((link, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="font-mono text-sm flex-1 truncate">{link}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(link, index)}
+                      >
+                        {copiedIndex === index ? (
+                          <Check className="w-4 h-4 text-success" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
