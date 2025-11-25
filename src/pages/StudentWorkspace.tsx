@@ -102,6 +102,48 @@ const StudentWorkspace = () => {
     }
   };
 
+  const getHighlightedText = (text: string, feedbackItems: FeedbackItem[]) => {
+    if (!feedbackItems || feedbackItems.length === 0) return text;
+
+    const sorted = [...feedbackItems].sort((a, b) => a.range.start - b.range.start);
+    const segments: React.ReactNode[] = [];
+    let currentIndex = 0;
+
+    sorted.forEach((item, idx) => {
+      const { start, end } = item.range;
+
+      if (start > currentIndex) {
+        segments.push(
+          <span key={`plain-${idx}-${currentIndex}`}>
+            {text.slice(currentIndex, start)}
+          </span>
+        );
+      }
+
+      segments.push(
+        <span
+          key={`hl-${item.id}`}
+          className={`${item.color} rounded-sm`}
+          title={item.hint}
+        >
+          {text.slice(start, end)}
+        </span>
+      );
+
+      currentIndex = end;
+    });
+
+    if (currentIndex < text.length) {
+      segments.push(
+        <span key={`plain-end-${currentIndex}`}>
+          {text.slice(currentIndex)}
+        </span>
+      );
+    }
+
+    return segments;
+  };
+
   const requestFeedback = () => {
     if (feedbackTokens === 0) {
       toast.error("Geen feedback-kansen meer beschikbaar");
@@ -118,18 +160,45 @@ const StudentWorkspace = () => {
       return;
     }
 
+    const criteria = assignmentData.criteria;
+    const textLength = text.length;
+
+    if (textLength === 0) {
+      toast.error("Er is geen tekst om feedback op te geven");
+      return;
+    }
+
     setFeedbackTokens((prev) => prev - 1);
 
-    const generatedFeedback: FeedbackItem[] = assignmentData.criteria.map((criterion, index) => ({
-      id: String(index + 1),
-      range: { start: 0, end: 0 },
-      color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-      type: "content",
-      hint: `Let op het criterium "${criterion.label}": ${criterion.description}`,
-    }));
+    // Simpele demo-logica:
+    // Verdeel de tekst in stukken en koppel elk criterium aan een segment,
+    // zodat we ranges hebben om te highlighten.
+    const maxCriteria = Math.min(criteria.length, 5);
+    const windowSize = Math.max(40, Math.floor(textLength / (maxCriteria || 1) / 2));
+
+    const generatedFeedback: FeedbackItem[] = criteria.slice(0, maxCriteria).map((criterion, index) => {
+      const center = Math.floor((textLength / (maxCriteria + 1)) * (index + 1));
+      let start = Math.max(0, center - windowSize);
+      let end = Math.min(textLength, center + windowSize);
+
+      if (start >= end) {
+        start = 0;
+        end = Math.min(textLength, windowSize);
+      }
+
+      const type: FeedbackItem["type"] = "content"; // voor nu altijd "content"
+
+      return {
+        id: String(index + 1),
+        range: { start, end },
+        color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
+        type,
+        hint: `Feedback bij criterium "${criterion.label}": ${criterion.description}`,
+      };
+    });
 
     setFeedback(generatedFeedback);
-    toast.success("Feedback ontvangen op basis van de beoordelingscriteria!");
+    toast.success("Voorbeeldfeedback gegenereerd op basis van de beoordelingscriteria.");
   };
 
   const dismissFeedback = (id: string) => {
@@ -240,6 +309,15 @@ const StudentWorkspace = () => {
                   onChange={(e) => handleTextChange(e.target.value)}
                   className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
+
+                {feedback.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <h3 className="text-sm font-medium">Gemarkeerde tekst (voorbeeldfeedback)</h3>
+                    <div className="p-3 rounded-md border bg-muted/40 whitespace-pre-wrap font-serif text-base leading-relaxed">
+                      {getHighlightedText(text, feedback)}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <Button
