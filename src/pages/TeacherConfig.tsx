@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { getCriteriaForLevel, masterCriteria } from "@/data/masterCriteria";
 
 type Criterion = {
   id: string;
@@ -38,16 +39,31 @@ const TeacherConfig = () => {
     // Simulate AI analysis - in production this would call the backend
     toast.success("AI analyseert de opdracht...");
     
-    // Mock criteria - in production these come from database + AI
-    const mockCriteria: Criterion[] = [
-      { id: "1", label: "Spelling en grammatica", description: "Correct taalgebruik", selected: true, isAiSuggestion: false },
-      { id: "2", label: "Structuur en opbouw", description: "Logische tekstopbouw", selected: true, isAiSuggestion: false },
-      { id: "3", label: "Woordenschat", description: "Passend bij niveau", selected: false, isAiSuggestion: false },
-      { id: "ai1", label: "Onderbouwing argumenten", description: "Voor dit essay type", selected: true, isAiSuggestion: true },
-      { id: "ai2", label: "Gebruik van bronnen", description: "Citaten en verwijzingen", selected: true, isAiSuggestion: true },
+    // Get master criteria for selected level
+    const masterCriteriaForLevel = getCriteriaForLevel(level);
+    
+    // Mock AI selection and suggestions - in production this would call OpenRouter API
+    // For now, randomly select some master criteria and add mock AI suggestions
+    const selectedMasterIds = masterCriteriaForLevel
+      .slice(0, Math.min(5, Math.floor(masterCriteriaForLevel.length / 2)))
+      .map(c => c.id);
+    
+    const masterCriteriaList: Criterion[] = masterCriteriaForLevel.map(mc => ({
+      id: mc.id,
+      label: mc.label,
+      description: mc.description,
+      selected: selectedMasterIds.includes(mc.id),
+      isAiSuggestion: false,
+      isCustom: false,
+    }));
+    
+    // Mock AI suggestions based on assignment text
+    const mockAiSuggestions: Criterion[] = [
+      { id: "ai1", label: "Onderbouwing van standpunt", description: "Specifiek voor dit type opdracht", selected: true, isAiSuggestion: true },
+      { id: "ai2", label: "Gebruik van voorbeelden", description: "Concrete voorbeelden ter ondersteuning", selected: true, isAiSuggestion: true },
     ];
     
-    setCriteria(mockCriteria);
+    setCriteria([...masterCriteriaList, ...mockAiSuggestions]);
   };
 
   const toggleCriterion = (id: string) => {
@@ -116,10 +132,11 @@ const TeacherConfig = () => {
                       <SelectValue placeholder="Selecteer niveau" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1F">1F - Basisniveau</SelectItem>
-                      <SelectItem value="2F">2F - Midden</SelectItem>
-                      <SelectItem value="3F">3F - Gevorderd</SelectItem>
-                      <SelectItem value="4F">4F - Expert</SelectItem>
+                      {masterCriteria.map((levelData) => (
+                        <SelectItem key={levelData.level} value={levelData.level}>
+                          {levelData.levelName}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
