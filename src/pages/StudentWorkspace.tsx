@@ -113,31 +113,23 @@ const StudentWorkspace = () => {
       return;
     }
 
-    // Simulate AI feedback - in production this calls the backend with criteria
-    setFeedbackTokens(feedbackTokens - 1);
-    
-    // In production: send text, assignmentData.criteria to backend for AI analysis
-    console.log("Beoordeling gebaseerd op criteria:", assignmentData?.criteria);
-    
-    const mockFeedback: FeedbackItem[] = [
-      {
-        id: "1",
-        range: { start: 0, end: 50 },
-        color: "bg-yellow-200",
-        type: "structure",
-        hint: "Overweeg een sterkere openingszin die de lezer direct aanspreekt",
-      },
-      {
-        id: "2",
-        range: { start: 100, end: 150 },
-        color: "bg-blue-200",
-        type: "content",
-        hint: "Dit argument zou versterkt kunnen worden met een voorbeeld",
-      },
-    ];
+    if (!assignmentData || !assignmentData.criteria || assignmentData.criteria.length === 0) {
+      toast.error("Er zijn geen beoordelingscriteria ingesteld door de docent");
+      return;
+    }
 
-    setFeedback(mockFeedback);
-    toast.success("Feedback ontvangen!");
+    setFeedbackTokens((prev) => prev - 1);
+
+    const generatedFeedback: FeedbackItem[] = assignmentData.criteria.map((criterion, index) => ({
+      id: String(index + 1),
+      range: { start: 0, end: 0 },
+      color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
+      type: "content",
+      hint: `Let op het criterium "${criterion.label}": ${criterion.description}`,
+    }));
+
+    setFeedback(generatedFeedback);
+    toast.success("Feedback ontvangen op basis van de beoordelingscriteria!");
   };
 
   const dismissFeedback = (id: string) => {
@@ -272,40 +264,6 @@ const StudentWorkspace = () => {
           </div>
 
           <div className="space-y-4">
-            {assignmentData && assignmentData.criteria.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Beoordelingscriteria</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {assignmentData.criteria.map((criterion) => (
-                      <div
-                        key={criterion.id}
-                        className="p-3 rounded-lg border bg-card space-y-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{criterion.label}</span>
-                          {criterion.isAiSuggestion && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Sparkles className="w-3 h-3 mr-1" />
-                              AI
-                            </Badge>
-                          )}
-                          {criterion.isCustom && (
-                            <Badge variant="outline" className="text-xs">
-                              Eigen
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{criterion.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardContent className="p-6 space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
