@@ -1,13 +1,27 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+
+type AssignmentCriterion = {
+  id: string;
+  label: string;
+  description: string;
+  isAiSuggestion?: boolean;
+  isCustom?: boolean;
+};
+
+type AssignmentData = {
+  level: string;
+  assignmentText: string;
+  criteria: AssignmentCriterion[];
+};
 
 type FeedbackItem = {
   id: string;
@@ -19,12 +33,25 @@ type FeedbackItem = {
 
 const StudentWorkspace = () => {
   const navigate = useNavigate();
+  const { code } = useParams<{ code: string }>();
+  const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null);
   const [text, setText] = useState("");
   const [wordCount, setWordCount] = useState(0);
   const [feedbackTokens, setFeedbackTokens] = useState(3);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
+
+  useEffect(() => {
+    if (code) {
+      const storedData = localStorage.getItem(`assignment_${code}`);
+      if (storedData) {
+        setAssignmentData(JSON.parse(storedData));
+      } else {
+        toast.error("Opdracht niet gevonden");
+      }
+    }
+  }, [code]);
 
   useEffect(() => {
     const words = text.trim().split(/\s+/).filter(Boolean).length;
@@ -63,8 +90,11 @@ const StudentWorkspace = () => {
       return;
     }
 
-    // Simulate AI feedback - in production this calls the backend
+    // Simulate AI feedback - in production this calls the backend with criteria
     setFeedbackTokens(feedbackTokens - 1);
+    
+    // In production: send text, assignmentData.criteria to backend for AI analysis
+    console.log("Beoordeling gebaseerd op criteria:", assignmentData?.criteria);
     
     const mockFeedback: FeedbackItem[] = [
       {
@@ -117,7 +147,7 @@ const StudentWorkspace = () => {
             </div>
           </div>
           <Badge variant="outline" className="hidden md:flex">
-            Code: ABC-123
+            Code: {code?.toUpperCase() || 'ABC-123'}
           </Badge>
         </div>
 
@@ -131,6 +161,21 @@ const StudentWorkspace = () => {
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
+            {assignmentData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Opdracht</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={assignmentData.assignmentText}
+                    readOnly
+                    className="min-h-[100px] resize-none bg-muted/50"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -181,6 +226,40 @@ const StudentWorkspace = () => {
           </div>
 
           <div className="space-y-4">
+            {assignmentData && assignmentData.criteria.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Beoordelingscriteria</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {assignmentData.criteria.map((criterion) => (
+                      <div
+                        key={criterion.id}
+                        className="p-3 rounded-lg border bg-card space-y-1"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{criterion.label}</span>
+                          {criterion.isAiSuggestion && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Sparkles className="w-3 h-3 mr-1" />
+                              AI
+                            </Badge>
+                          )}
+                          {criterion.isCustom && (
+                            <Badge variant="outline" className="text-xs">
+                              Eigen
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{criterion.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardContent className="p-6 space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">

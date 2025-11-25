@@ -105,6 +105,21 @@ const TeacherConfig = () => {
     // Generate unique codes for each student
     const links = Array.from({ length: count }, (_, i) => {
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+      
+      // Store assignment data in localStorage for this code
+      const assignmentData = {
+        level,
+        assignmentText,
+        criteria: selectedCriteria.map(c => ({
+          id: c.id,
+          label: c.label,
+          description: c.description,
+          isAiSuggestion: c.isAiSuggestion,
+          isCustom: c.isCustom
+        }))
+      };
+      localStorage.setItem(`assignment_${code}`, JSON.stringify(assignmentData));
+      
       return `${window.location.origin}/student/${code}`;
     });
     
