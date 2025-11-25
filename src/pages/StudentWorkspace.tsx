@@ -266,8 +266,7 @@ const StudentWorkspace = () => {
           </AlertDescription>
         </Alert>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
+        <div className="max-w-4xl mx-auto space-y-4">
             {assignmentData && (
               <Card>
                 <CardHeader>
@@ -339,60 +338,6 @@ const StudentWorkspace = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
-
-          <div className="space-y-4">
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-accent" />
-                  Feedback
-                </h3>
-                
-                {feedback.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nog geen feedback ontvangen. Gebruik een van je feedback-kansen om hulp te krijgen.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {feedback.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-3 rounded-lg border bg-card space-y-2"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {item.type}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => dismissFeedback(item.id)}
-                            className="h-6 px-2 text-xs"
-                          >
-                            Negeer
-                          </Button>
-                        </div>
-                        <p className="text-sm">{item.hint}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-muted/50">
-              <CardContent className="p-6 space-y-2">
-                <h4 className="font-medium text-sm">Tips voor Succes</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Plan je feedback-vragen strategisch</li>
-                  <li>• Schrijf eerst een ruwe versie compleet</li>
-                  <li>• Let op de woordlimiet</li>
-                  <li>• Download je werk aan het einde</li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
     </div>
