@@ -11,11 +11,10 @@ const Index = () => {
       <div className="max-w-4xl w-full space-y-8">
         <div className="text-center space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-            AI Schrijfassistent
+            PUNT!
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Een intelligente schrijfomgeving voor het onderwijs. Docenten creëren opdrachten, 
-            leerlingen schrijven met gerichte AI-feedback.
+            Een intelligente schrijfomgeving voor het onderwijs. Zo simpel is het.
           </p>
         </div>
 
