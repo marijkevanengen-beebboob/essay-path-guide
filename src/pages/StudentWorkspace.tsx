@@ -40,8 +40,11 @@ const StudentWorkspace = () => {
   const [wordCount, setWordCount] = useState(0);
   const [feedbackTokens, setFeedbackTokens] = useState(3);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
+
+  const activeFeedback = feedback.find(f => f.id === activeFeedbackId) || null;
 
   useEffect(() => {
     console.log("StudentWorkspace - Code from URL:", code);
@@ -123,8 +126,8 @@ const StudentWorkspace = () => {
       segments.push(
         <span
           key={`hl-${item.id}`}
-          className={`${item.color} rounded-sm`}
-          title={item.hint}
+          className={`${item.color} rounded-sm cursor-pointer hover:opacity-80 transition-opacity`}
+          onClick={() => setActiveFeedbackId(item.id)}
         >
           {text.slice(start, end)}
         </span>
@@ -311,10 +314,53 @@ const StudentWorkspace = () => {
 
                 {feedback.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <h3 className="text-sm font-medium">Gemarkeerde tekst (voorbeeldfeedback)</h3>
+                    <h3 className="text-sm font-medium">Gemarkeerde tekst (klik op markering voor feedback)</h3>
                     <div className="p-3 rounded-md border bg-muted/40 whitespace-pre-wrap font-serif text-base leading-relaxed">
                       {getHighlightedText(text, feedback)}
                     </div>
+                  </div>
+                )}
+
+                {activeFeedback && (
+                  <div className="mt-4">
+                    <Card className="bg-card border shadow-md">
+                      <CardHeader>
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          Feedback
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {activeFeedback.type}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <p className="text-sm leading-relaxed">
+                          {activeFeedback.hint}
+                        </p>
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
+                              setActiveFeedbackId(null);
+                              toast.success("Feedback geaccepteerd");
+                            }}
+                          >
+                            Accepteren
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
+                              setActiveFeedbackId(null);
+                              toast.message("Feedback genegeerd");
+                            }}
+                          >
+                            Negeren
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
 
