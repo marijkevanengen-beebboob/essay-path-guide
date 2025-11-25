@@ -311,7 +311,14 @@ const TeacherConfig = () => {
                       key={index}
                       className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
-                      <span className="font-mono text-sm flex-1 truncate">{link}</span>
+                      <a 
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-sm flex-1 truncate text-primary hover:underline"
+                      >
+                        {link}
+                      </a>
                       <Button
                         variant="ghost"
                         size="icon"
