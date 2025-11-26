@@ -207,7 +207,7 @@ const TeacherConfig = () => {
 
               <Button onClick={handleAnalyze} className="w-full md:w-auto">
                 <Sparkles className="w-4 h-4 mr-2" />
-                Analyseer met AI
+                Maak de opdracht
               </Button>
             </CardContent>
           </Card>
