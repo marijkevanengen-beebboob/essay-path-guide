@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { generatePDF } from "@/lib/pdfGenerator";
+import { generateAIReflection } from "@/lib/openRouterApi";
 
 type AssignmentCriterion = {
   id: string;
@@ -43,6 +45,13 @@ const StudentWorkspace = () => {
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
+  
+  // PDF tracking states
+  const [firstFeedbackVersion, setFirstFeedbackVersion] = useState<string | null>(null);
+  const [hasRequestedFeedbackOnce, setHasRequestedFeedbackOnce] = useState(false);
+  const [copyPasteTriggered, setCopyPasteTriggered] = useState(false);
+  const [sessionStartTime] = useState<number>(Date.now());
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const activeFeedback = feedback.find(f => f.id === activeFeedbackId) || null;
 
@@ -163,6 +172,12 @@ const StudentWorkspace = () => {
       return;
     }
 
+    // Save first version on first feedback request
+    if (!hasRequestedFeedbackOnce) {
+      setFirstFeedbackVersion(text);
+      setHasRequestedFeedbackOnce(true);
+    }
+
     const criteria = assignmentData.criteria;
     const textLength = text.length;
 
@@ -208,14 +223,64 @@ const StudentWorkspace = () => {
     setFeedback(feedback.filter(f => f.id !== id));
   };
 
-  const downloadPDF = () => {
-    // In production, this would generate and download an actual PDF
-    toast.success("PDF wordt gegenereerd...");
-    setHasDownloaded(true);
-    
-    setTimeout(() => {
-      toast.success("PDF gedownload!");
-    }, 1500);
+  const downloadPDF = async () => {
+    if (!text.trim()) {
+      toast.error("Schrijf eerst wat tekst voordat je een PDF downloadt");
+      return;
+    }
+
+    if (!assignmentData || !code) {
+      toast.error("Opdrachtgegevens ontbreken");
+      return;
+    }
+
+    setIsGeneratingPDF(true);
+    toast.loading("PDF wordt gegenereerd...", { id: "pdf-generation" });
+
+    try {
+      let aiReflection: string | undefined;
+
+      // Generate AI reflection if feedback was used
+      if (hasRequestedFeedbackOnce && firstFeedbackVersion) {
+        try {
+          aiReflection = await generateAIReflection(
+            firstFeedbackVersion,
+            text,
+            assignmentData.criteria.map(c => ({
+              label: c.label,
+              description: c.description
+            }))
+          );
+        } catch (error) {
+          console.error("Failed to generate AI reflection:", error);
+          // Continue without AI reflection
+        }
+      }
+
+      await generatePDF({
+        code,
+        level: assignmentData.level,
+        assignmentText: assignmentData.assignmentText,
+        criteria: assignmentData.criteria.map(c => ({
+          label: c.label,
+          description: c.description
+        })),
+        firstFeedbackVersion,
+        finalText: text,
+        hasRequestedFeedbackOnce,
+        copyPasteTriggered,
+        sessionStartTime,
+        aiReflection,
+      });
+
+      setHasDownloaded(true);
+      toast.success("PDF succesvol gedownload!", { id: "pdf-generation" });
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("Fout bij genereren van PDF", { id: "pdf-generation" });
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const wordProgress = (wordCount / 1000) * 100;
@@ -309,6 +374,7 @@ const StudentWorkspace = () => {
                   placeholder="Begin hier met schrijven..."
                   value={text}
                   onChange={(e) => handleTextChange(e.target.value)}
+                  onPaste={() => setCopyPasteTriggered(true)}
                   className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
 
@@ -377,9 +443,10 @@ const StudentWorkspace = () => {
                     onClick={downloadPDF}
                     variant="outline"
                     className="flex-1"
+                    disabled={isGeneratingPDF || !text.trim()}
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Download PDF
+                    {isGeneratingPDF ? "Bezig..." : "Afronden & Downloaden"}
                   </Button>
                 </div>
               </CardContent>
