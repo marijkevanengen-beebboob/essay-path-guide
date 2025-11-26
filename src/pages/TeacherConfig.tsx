@@ -123,6 +123,10 @@ const TeacherConfig = () => {
     const links = Array.from({ length: count }, (_, i) => {
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
       
+      // Get AI config to include with assignment
+      const aiConfigStr = localStorage.getItem("ai_config");
+      const aiConfig = aiConfigStr ? JSON.parse(aiConfigStr) : null;
+      
       // Store assignment data in localStorage for this code
       const assignmentData = {
         level,
@@ -133,7 +137,9 @@ const TeacherConfig = () => {
           description: c.description,
           isAiSuggestion: c.isAiSuggestion,
           isCustom: c.isCustom
-        }))
+        })),
+        // Include AI config so students can use AI features
+        aiConfig: aiConfig
       };
       const key = `assignment_${code}`;
       console.log("TeacherConfig - Storing with key:", key);

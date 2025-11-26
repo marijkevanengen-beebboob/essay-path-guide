@@ -23,6 +23,7 @@ type AssignmentData = {
   level: string;
   assignmentText: string;
   criteria: AssignmentCriterion[];
+  aiConfig?: { apiKey: string; model: string } | null;
 };
 
 type FeedbackItem = {
@@ -186,7 +187,8 @@ const StudentWorkspace = () => {
         text,
         assignmentData.level,
         assignmentData.assignmentText,
-        assignmentData.criteria
+        assignmentData.criteria,
+        assignmentData.aiConfig || null
       );
 
       // Convert AI feedback to UI format
@@ -243,7 +245,8 @@ const StudentWorkspace = () => {
             assignmentData.criteria.map(c => ({
               label: c.label,
               description: c.description
-            }))
+            })),
+            assignmentData.aiConfig || null
           );
         } catch (error) {
           console.error("Failed to generate AI reflection:", error);

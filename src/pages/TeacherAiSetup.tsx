@@ -65,12 +65,10 @@ export default function TeacherAiSetup() {
                     <p className="text-sm">
                       Je voert hier je persoonlijke OpenRouter API-sleutel in.
                       Deze sleutel wordt gebruikt om AI-feedback te genereren voor PUNT!.
-                      De sleutel wordt lokaal in je browser opgeslagen (niet op een server).
-                      Leerlingen hebben geen toegang tot deze sleutel.
+                      De sleutel wordt versleuteld meegestuurd in de opdracht-links zodat leerlingen op elk apparaat AI-feedback kunnen ontvangen.
                     </p>
                     <p className="text-sm mt-2">
-                      <strong>Let op:</strong> In een educatieve setting is dit acceptabel, 
-                      maar voor productiegebruik raden we een echte backend aan.
+                      <strong>Let op:</strong> Deel de gegenereerde links alleen via beveiligde kanalen (bijv. je leeromgeving).
                     </p>
                   </TooltipContent>
                 </Tooltip>
