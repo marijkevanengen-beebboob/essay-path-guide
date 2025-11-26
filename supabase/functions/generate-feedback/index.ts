@@ -50,17 +50,41 @@ serve(async (req) => {
       );
     }
 
-    // Build the system prompt for new feedback structure
-    const systemPrompt = `Je bent een schrijfcoach voor leerlingen in het Nederlandse taalonderwijs.
-Je krijgt een leerlingtekst, de opdracht van de docent, en criteria waar de tekst aan getoetst moet worden.
+    // Build the system prompt for new feedback structure with MACRO-MESO-MICRO analysis
+    const systemPrompt = `Je bent een feedbacksysteem voor PUNT!, een schrijfplatform voor taalonderwijs (niveau ${level}).
 
-BELANGRIJKE REGELS:
-1. Je analyseert de tekst ZONDER deze te herschrijven
-2. Je kopieert NOOIT fragmenten uit de leerlingtekst
-3. Je geeft alleen verwijzingen naar locaties (bijv. "Alinea 2", "Titel", "Slot")
-4. Je identificeert maximaal 5 kernpunten per feedbackronde
-5. Je feedback is kritisch en concreet - geen complimenten, geen samenvatting
-6. Je noemt alleen problemen en geeft advies voor verbetering
+Je taak is om leerlingteksten te beoordelen volgens de door de docent ingestelde criteria.
+
+ANALYSESTRUCTUUR (VERPLICHT IN DEZE VOLGORDE):
+
+1. MACRO-ANALYSE (altijd eerst):
+   - Bepaal tekstfunctie (beschouwen/betogen/informeren/etc.)
+   - Tel aantal alinea's
+   - Controleer globale structuur: titel, inleiding, middenstuk, slot
+   - Beoordeel logische opbouw van de tekst als geheel
+
+2. MESO-ANALYSE (inhoud & argumentatie):
+   - Vergelijk tekst met opdracht: welke inhoudelijke eisen worden gehaald?
+   - Analyseer argumentatie, relevantie, voorbeelden, consistentie
+   - Relatie met onderwerp en niveau ${level}
+
+3. MICRO-ANALYSE (taalniveau):
+   - Woordkeuze, zinsbouw, spelling, interpunctie
+   - Alleen als grotere macro/meso problemen afwezig zijn
+
+NIVEAUPROFIELEN:
+- 1F: begrijpelijkheid, eenvoudige zinnen, minimale structuur
+- 2F: duidelijke opbouw, eenvoudige logica, basisargumentatie
+- 3F: consistente redenering, passende structuur, helder register
+- 4F: nuance, diepgang, retoriek, publieksgericht schrijven, professionele stijl
+
+FEEDBACKREGELS:
+1. Maximaal 5 concrete verbeterpunten (prioriteit: macro → meso → micro)
+2. GEEN complimenten - alleen verbeteringen
+3. Wees concreet en toepasbaar, nooit vaag
+4. Bij elk feedbackpunt: citeer het exacte woord of de zinsnede waar het over gaat
+5. Vermeld altijd de locatie (bijv. "in alinea 2", "in de titel")
+6. Kopieer max 1-2 zinnen als citaat, niet meer
 
 CONTEXT:
 - Niveau: ${level}
@@ -69,48 +93,22 @@ CONTEXT:
 
 ${round > 1 ? `EERDERE FEEDBACK (vermijd herhaling):\n${JSON.stringify(previousFeedback)}` : ''}
 
-OPDRACHT VAN DE DOCENT (PRIORITEIT):
-${assignmentText}
-
-WERKWIJZE:
-1. Lees de volledige leerlingtekst
-2. Analyseer wat de opdracht van de docent vraagt
-3. Controleer welke criteria aangezet zijn
-4. Bepaal wat ontbreekt of fout gaat
-5. Genereer eerst een checklist op basis van de opdracht
-6. Geef maximaal 5 feedbackpunten
-
-OUTPUT FORMAAT:
-Geef je analyse terug als JSON met deze structuur:
+OUTPUT FORMAAT (JSON):
 {
   "checklistResults": [
-    {"id": "check-1", "label": "Korte omschrijving wat gecheckt wordt", "met": true/false, "explanation": "Waarom wel/niet voldaan"}
+    {"label": "korte eis", "description": "uitleg waarom dit belangrijk is", "passed": true/false}
   ],
   "feedbackItems": [
     {
-      "location": "Titel | Alinea 1 | Alinea 2 - zin 3 | Slot",
-      "problem": "Duidelijke, kritische beschrijving van het probleem",
-      "advice": "Wat de leerling moet aanpassen (toevoegen/schrappen/herformuleren/verplaatsen)"
+      "location": "Titel / Inleiding / Alinea X / Slot",
+      "quote": "exacte tekst uit de leerlingtekst (max 1-2 zinnen)",
+      "problem": "wat is er niet goed",
+      "advice": "wat moet de leerling veranderen"
     }
   ]
 }
 
-CHECKLIST:
-- Genereer 3-5 checklistitems op basis van de opdracht van de docent
-- Items zijn concreet controleerbaar (bijv. "Titel aanwezig", "Minstens 3 alinea's", "Inleiding bevat standpunt")
-- Elke check heeft een duidelijke label en explanation
-
-FEEDBACKPUNTEN:
-- Maximaal 5 punten
-- Elk punt heeft location, problem, advice
-- Location is logisch (Titel/Alinea X/Slot)
-- Problem is kritisch en specifiek
-- Advice is concreet en actionable
-- GEEN tekstfragmenten kopiëren
-- GEEN complimenten
-- Focus op wat ONTBREEKT of FOUT is
-
-Wees streng, concreet en kritisch. De leerling wil echte verbeterpunten.`;
+Wees streng, concreet en kritisch volgens de macro-meso-micro volgorde. De leerling wil echte verbeterpunten.`;
 
     const userPrompt = `OPDRACHT VAN DE DOCENT:
 ${assignmentText || "Geen specifieke opdracht gegeven"}
@@ -130,16 +128,22 @@ ${previousFeedback.length > 0
 ` : ''}
 
 INSTRUCTIE RONDE ${round}:
-1. Genereer EERST een checklist (3-5 items) op basis van wat de opdracht van de docent vraagt
-2. Beoordeel elk checklist-item: aanwezig (met: true) of niet (met: false)?
-3. Geef daarna MAXIMAAL 5 ${round > 1 ? 'NIEUWE ' : ''}inhoudelijke verbeterpunten
-4. Elk feedbackpunt MOET hebben:
-   - location: logische verwijzing (bijv. "Titel", "Alinea 1", "Alinea 2 - zin 3", "Slot")
-   - problem: kritische beschrijving van wat er mis is
-   - advice: concrete instructie wat de leerling moet doen
-5. GEEN tekstfragmenten kopiëren, GEEN complimenten, ALLEEN problemen
+Volg de MACRO-MESO-MICRO analysestructuur strikt:
 
-Return het JSON object met checklistResults én feedbackItems.`;
+1. MACRO: Genereer EERST een checklist (3-5 items) over structuur en globale opbouw
+   - Beoordeel elk item: passed: true/false
+   
+2. MESO + MICRO: Geef daarna MAXIMAAL 5 ${round > 1 ? 'NIEUWE ' : ''}verbeterpunten (prioriteit macro → meso → micro)
+
+3. Elk feedbackpunt MOET hebben:
+   - location: "in de titel", "in alinea 1", "in het slot", etc.
+   - quote: exacte woord of zinsnede uit de leerlingtekst (max 1-2 zinnen)
+   - problem: wat is er niet goed
+   - advice: concrete actie (toevoegen/schrappen/herformuleren/verplaatsen)
+
+4. GEEN complimenten, ALLEEN concrete verbeteringen
+
+Return het JSON object met checklistResults én feedbackItems met daarin location, quote, problem en advice.`;
 
     console.log('Calling OpenRouter API with model:', config.model);
 
@@ -191,16 +195,17 @@ Return het JSON object met checklistResults én feedbackItems.`;
     const checklistResults = (aiResponse.checklistResults || []).map((item: any, index: number) => ({
       id: item.id || `check-${index}`,
       label: item.label || 'Onbekend criterium',
-      met: item.met === true,
-      explanation: item.explanation || ''
+      met: item.passed === true || item.met === true,
+      explanation: item.explanation || item.description || ''
     }));
 
-    // Format feedback items (no ranges, simple structure)
+    // Format feedback items with quotes
     const formattedFeedback = (aiResponse.feedbackItems || [])
       .slice(0, 5) // Enforce max 5 items
       .map((item: any, index: number) => ({
         id: `feedback-${index}-${Date.now()}`,
         location: item.location || 'Onbekende locatie',
+        quote: item.quote || '',
         problem: item.problem || 'Geen probleem beschrijving',
         advice: item.advice || 'Geen advies beschikbaar'
       }));
