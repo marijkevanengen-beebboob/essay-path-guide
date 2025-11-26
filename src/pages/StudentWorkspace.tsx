@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle, Shield } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 type AssignmentCriterion = {
   id: string;
@@ -132,50 +133,6 @@ const StudentWorkspace = () => {
     }
   };
 
-  const getHighlightedText = (text: string, feedbackItems: FeedbackItem[]) => {
-    if (!feedbackItems || feedbackItems.length === 0) return text;
-
-    const sorted = [...feedbackItems].sort((a, b) => a.range.start - b.range.start);
-    const segments: React.ReactNode[] = [];
-    let currentIndex = 0;
-
-    sorted.forEach((item, idx) => {
-      const { start, end } = item.range;
-
-      if (start > currentIndex) {
-        segments.push(
-          <span key={`plain-${idx}-${currentIndex}`}>
-            {text.slice(currentIndex, start)}
-          </span>
-        );
-      }
-
-      segments.push(
-        <span
-          key={`hl-${item.id}`}
-          className={`${item.color} rounded-sm cursor-pointer hover:opacity-70 transition-all px-1 py-0.5 font-medium border-b-2 border-current ${
-            activeFeedbackId === item.id ? 'ring-2 ring-primary ring-offset-2' : ''
-          }`}
-          onClick={() => setActiveFeedbackId(item.id)}
-        >
-          {text.slice(start, end)}
-        </span>
-      );
-
-      currentIndex = end;
-    });
-
-    if (currentIndex < text.length) {
-      segments.push(
-        <span key={`plain-end-${currentIndex}`}>
-          {text.slice(currentIndex)}
-        </span>
-      );
-    }
-
-    return segments;
-  };
-
   const requestFeedback = async () => {
     if (feedbackTokens === 0) {
       toast.error("Geen feedback-kansen meer beschikbaar");
@@ -253,17 +210,9 @@ const StudentWorkspace = () => {
         });
       } else {
         toast.success(`Checklist bijgewerkt + ${newFeedback.length} ${currentRound > 1 ? 'nieuwe ' : ''}feedbackpunten`, {
-          description: "Scroll naar beneden om de resultaten te zien"
+          description: "Klik op onderstreepte tekst om feedback te zien"
         });
       }
-      
-      // Auto-scroll to highlighted text after a short delay
-      setTimeout(() => {
-        const highlightedSection = document.querySelector('.highlighted-text-section');
-        if (highlightedSection) {
-          highlightedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 500);
 
     } catch (error) {
       console.error('Error requesting feedback:', error);
@@ -449,12 +398,14 @@ const StudentWorkspace = () => {
                   </div>
                 </div>
 
-                <Textarea
+                <RichTextEditor
                   placeholder="Begin hier met schrijven..."
                   value={text}
-                  onChange={(e) => handleTextChange(e.target.value)}
+                  onChange={handleTextChange}
                   onPaste={handlePaste}
-                  className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
+                  feedbackItems={feedback}
+                  onFeedbackClick={setActiveFeedbackId}
+                  activeFeedbackId={activeFeedbackId}
                 />
 
                 {checklistResults.length > 0 && (
@@ -496,26 +447,6 @@ const StudentWorkspace = () => {
                   </Card>
                 )}
 
-                {feedback.length > 0 && (
-                  <div className="mt-6 space-y-3 highlighted-text-section">
-                    <Alert className="bg-primary/5 border-primary/20">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <AlertDescription>
-                        <strong>{feedback.length} feedback punten gevonden!</strong> Klik op de gekleurde markeringen hieronder om de feedback te lezen.
-                      </AlertDescription>
-                    </Alert>
-                    <div className="relative">
-                      <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-                        <span className="inline-block w-3 h-3 bg-yellow-200 rounded"></span>
-                        <span className="inline-block w-3 h-3 bg-blue-200 rounded"></span>
-                        Gemarkeerde tekst
-                      </h3>
-                      <div className="p-4 rounded-lg border-2 border-primary/20 bg-card shadow-sm whitespace-pre-wrap font-serif text-base leading-relaxed">
-                        {getHighlightedText(text, feedback)}
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {activeFeedback && (
                   <div className="mt-4">
