@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle, Shield, ChevronDown } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { RichTextEditor } from "@/components/RichTextEditor";
+
 
 type AssignmentCriterion = {
   id: string;
@@ -27,12 +27,9 @@ type AssignmentData = {
 
 type FeedbackItem = {
   id: string;
-  range: { start: number; end: number };
-  color: string;
-  type: "spelling" | "grammar" | "structure" | "content";
-  hint: string;
-  criterionLabel?: string;
-  sentenceIndex?: number;
+  location: string;
+  problem: string;
+  advice: string;
 };
 
 type ChecklistResult = {
@@ -52,8 +49,7 @@ const StudentWorkspace = () => {
   const [feedbackTokens, setFeedbackTokens] = useState(3);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [checklistResults, setChecklistResults] = useState<ChecklistResult[]>([]);
-  const [previousFeedback, setPreviousFeedback] = useState<FeedbackItem[]>([]);
-  const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
+  const [previousFeedback, setPreviousFeedback] = useState<any[]>([]);
   const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [showExitWarning, setShowExitWarning] = useState(true);
@@ -64,7 +60,7 @@ const StudentWorkspace = () => {
   const [hasRequestedFeedbackOnce, setHasRequestedFeedbackOnce] = useState(false);
   const [copyPasteTriggered, setCopyPasteTriggered] = useState(false);
 
-  const activeFeedback = feedback.find(f => f.id === activeFeedbackId) || null;
+  
 
   useEffect(() => {
     console.log("StudentWorkspace - Code from URL:", code);
@@ -180,11 +176,7 @@ const StudentWorkspace = () => {
           level: assignmentData.level,
           criteria: assignmentData.criteria,
           round: currentRound,
-          previousFeedback: previousFeedback.map(f => ({
-            sentenceIndex: f.sentenceIndex,
-            criterionLabel: f.criterionLabel,
-            hint: f.hint
-          }))
+          previousFeedback: previousFeedback
         }),
       });
 
@@ -227,9 +219,6 @@ const StudentWorkspace = () => {
     }
   };
 
-  const dismissFeedback = (id: string) => {
-    setFeedback(feedback.filter(f => f.id !== id));
-  };
 
   const downloadPDF = async () => {
     if (!text.trim()) {
@@ -379,9 +368,7 @@ const StudentWorkspace = () => {
           </Card>
         )}
 
-        <div className="flex gap-6 items-start">
-          {/* Left Column - Writing Area */}
-          <div className="flex-1 space-y-4">
+        <div className="space-y-4">
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -402,14 +389,12 @@ const StudentWorkspace = () => {
                   </div>
                 </div>
 
-                <RichTextEditor
+                <Textarea
                   placeholder="Begin hier met schrijven..."
                   value={text}
-                  onChange={handleTextChange}
+                  onChange={(e) => handleTextChange(e.target.value)}
                   onPaste={handlePaste}
-                  feedbackItems={feedback}
-                  onFeedbackClick={setActiveFeedbackId}
-                  activeFeedbackId={activeFeedbackId}
+                  className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
 
                 {checklistResults.length > 0 && (
@@ -420,7 +405,7 @@ const StudentWorkspace = () => {
                           <CardTitle className="text-base flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <CheckCircle className="w-4 h-4" />
-                              Checklist uit de opdracht
+                              Checklist
                             </div>
                             <ChevronDown className={`w-4 h-4 transition-transform ${checklistOpen ? 'rotate-180' : ''}`} />
                           </CardTitle>
@@ -460,6 +445,32 @@ const StudentWorkspace = () => {
                   </Collapsible>
                 )}
 
+                {feedback.length > 0 && (
+                  <Card className="border-2 border-primary/20 mt-4">
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        Feedback
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {feedback.map((item) => (
+                        <Alert key={item.id} className="bg-muted/30">
+                          <AlertDescription className="space-y-2">
+                            <div className="font-semibold text-sm">📍 {item.location}</div>
+                            <div className="text-sm">
+                              <span className="font-medium">Probleem:</span> {item.problem}
+                            </div>
+                            <div className="text-sm">
+                              <span className="font-medium">Advies:</span> {item.advice}
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="flex gap-2">
                   <Button
                     onClick={requestFeedback}
@@ -480,58 +491,7 @@ const StudentWorkspace = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Right Column - Feedback Panel */}
-          <div className="w-80 sticky top-4">
-            {activeFeedback ? (
-              <Card className="bg-card border shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center justify-between">
-                    Feedback
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {activeFeedback.type}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm leading-relaxed">
-                    {activeFeedback.hint}
-                  </p>
-                  <div className="flex gap-2 justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
-                        setActiveFeedbackId(null);
-                        toast.success("Feedback geaccepteerd");
-                      }}
-                    >
-                      Accepteren
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
-                        setActiveFeedbackId(null);
-                        toast.message("Feedback genegeerd");
-                      }}
-                    >
-                      Negeren
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : feedback.length > 0 ? (
-              <Card className="bg-muted/30 border-dashed">
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>Klik op een onderstreept stuk tekst om de feedback te zien</p>
-                </CardContent>
-              </Card>
-            ) : null}
-          </div>
         </div>
       </div>
     </div>
