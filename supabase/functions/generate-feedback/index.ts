@@ -137,10 +137,19 @@ Je antwoord MOET deze EXACTE JSON-structuur hebben:
 }`
       : `Je bent een ervaren docent Nederlands in het voortgezet onderwijs.
 
-RONDE ${round}: NIEUWE INHOUDELIJKE FEEDBACK
+RONDE ${round}: OPDRACHT-CHECKLIST + NIEUWE INHOUDELIJKE FEEDBACK
 
-Dit is feedbackronde ${round} van 3. De leerling heeft eerder al feedback ontvangen.
+Dit is feedbackronde ${round} van 3. De leerling heeft eerder al feedback ontvangen en mogelijk zijn tekst aangepast.
 
+In deze feedbackronde geef je TWEE soorten feedback:
+
+A) OPDRACHT-CHECKLIST BEOORDELING (OPNIEUW):
+Je krijgt een lijst "Opdracht-checklist" met minimumeisen uit de opdracht.
+Voor elk item bepaal je OPNIEUW: is dit in de HUIDIGE tekst aanwezig (MET) of niet (NIET MET)?
+Geef per item een korte, concrete uitleg (max 1 zin) waarom wel/niet.
+Dit is belangrijk omdat de leerling mogelijk dingen heeft toegevoegd of aangepast.
+
+B) NIEUWE INHOUDELIJKE VERBETERPUNTEN (max 5):
 KRITISCHE REGEL: Geef ALLEEN feedback op punten die je NIET eerder hebt benoemd.
 - Herhaal GEEN feedback op dezelfde zin/hetzelfde criterium als in eerdere rondes
 - Kies nieuwe, andere verbeterpunten
@@ -154,17 +163,30 @@ DENKSTAPPEN:
    - Eerste regel = titel
    - Inleiding, middenstuk, slot
 
-3. VERGELIJK MET EERDERE FEEDBACK:
+3. BEOORDEEL OPDRACHT-CHECKLIST OPNIEUW:
+   - Loop elk checklist-item af
+   - Is dit aanwezig in de HUIDIGE tekst? Ja/Nee
+   - Korte uitleg (1 zin)
+
+4. VERGELIJK MET EERDERE FEEDBACK:
    - Welke zinnen/criteria zijn AL behandeld?
    - Welke verbeterpunten zijn NOG NIET benoemd?
 
-4. KIES MAXIMAAL 5 NIEUWE VERBETERPUNTEN:
+5. KIES MAXIMAAL 5 NIEUWE VERBETERPUNTEN:
    - Alleen punten die NIET in eerdere rondes zijn gegeven
    - Concrete acties
    - Als er weinig nieuwe punten zijn: geef minder items
 
 Je antwoord MOET deze EXACTE JSON-structuur hebben:
 {
+  "checklistResults": [
+    {
+      "id": "chk_id",
+      "label": "Label van checklist-item",
+      "met": true,
+      "explanation": "Korte uitleg waarom dit wel/niet is voldaan"
+    }
+  ],
   "feedbackItems": [
     {
       "sentenceIndex": 0,
@@ -175,7 +197,7 @@ Je antwoord MOET deze EXACTE JSON-structuur hebben:
   ]
 }
 
-BELANGRIJK: Als er nauwelijks nieuwe verbeterpunten zijn, retourneer een lege array []`;
+BELANGRIJK: Als er nauwelijks nieuwe verbeterpunten zijn, retourneer een lege array [] voor feedbackItems, maar retourneer ALTIJD checklistResults.`;
 
     const userPrompt = `OPDRACHT VAN DE DOCENT:
 ${assignmentText || "Geen specifieke opdracht gegeven"}
