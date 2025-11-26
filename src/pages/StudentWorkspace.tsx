@@ -8,8 +8,6 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { generatePDF } from "@/lib/pdfGenerator";
-import { generateAIReflection, generateFeedback } from "@/lib/openRouterApi";
 
 type AssignmentCriterion = {
   id: string;
@@ -23,7 +21,6 @@ type AssignmentData = {
   level: string;
   assignmentText: string;
   criteria: AssignmentCriterion[];
-  aiConfig?: { apiKey: string; model: string } | null;
 };
 
 type FeedbackItem = {
@@ -46,13 +43,6 @@ const StudentWorkspace = () => {
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
-  
-  // PDF tracking states
-  const [firstFeedbackVersion, setFirstFeedbackVersion] = useState<string | null>(null);
-  const [hasRequestedFeedbackOnce, setHasRequestedFeedbackOnce] = useState(false);
-  const [copyPasteTriggered, setCopyPasteTriggered] = useState(false);
-  const [sessionStartTime] = useState<number>(Date.now());
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const activeFeedback = feedback.find(f => f.id === activeFeedbackId) || null;
 
@@ -157,7 +147,7 @@ const StudentWorkspace = () => {
     return segments;
   };
 
-  const requestFeedback = async () => {
+  const requestFeedback = () => {
     if (feedbackTokens === 0) {
       toast.error("Geen feedback-kansen meer beschikbaar");
       return;
@@ -173,111 +163,59 @@ const StudentWorkspace = () => {
       return;
     }
 
-    // Save first version on first feedback request
-    if (!hasRequestedFeedbackOnce) {
-      setFirstFeedbackVersion(text);
-      setHasRequestedFeedbackOnce(true);
+    const criteria = assignmentData.criteria;
+    const textLength = text.length;
+
+    if (textLength === 0) {
+      toast.error("Er is geen tekst om feedback op te geven");
+      return;
     }
 
     setFeedbackTokens((prev) => prev - 1);
-    toast.loading("AI analyseert je tekst...", { id: "feedback-generation" });
 
-    try {
-      const aiFeedback = await generateFeedback(
-        text,
-        assignmentData.level,
-        assignmentData.assignmentText,
-        assignmentData.criteria,
-        assignmentData.aiConfig || null
-      );
+    // Simpele demo-logica:
+    // Verdeel de tekst in stukken en koppel elk criterium aan een segment,
+    // zodat we ranges hebben om te highlighten.
+    const maxCriteria = Math.min(criteria.length, 5);
+    const windowSize = Math.max(40, Math.floor(textLength / (maxCriteria || 1) / 2));
 
-      // Convert AI feedback to UI format
-      const generatedFeedback: FeedbackItem[] = aiFeedback.map((item, index) => ({
+    const generatedFeedback: FeedbackItem[] = criteria.slice(0, maxCriteria).map((criterion, index) => {
+      const center = Math.floor((textLength / (maxCriteria + 1)) * (index + 1));
+      let start = Math.max(0, center - windowSize);
+      let end = Math.min(textLength, center + windowSize);
+
+      if (start >= end) {
+        start = 0;
+        end = Math.min(textLength, windowSize);
+      }
+
+      const type: FeedbackItem["type"] = "content"; // voor nu altijd "content"
+
+      return {
         id: String(index + 1),
-        range: item.range,
+        range: { start, end },
         color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-        type: item.type,
-        hint: `${item.criterionLabel}: ${item.hint}`,
-      }));
+        type,
+        hint: `Feedback bij criterium "${criterion.label}": ${criterion.description}`,
+      };
+    });
 
-      setFeedback(generatedFeedback);
-      toast.success("AI-feedback ontvangen!", { id: "feedback-generation" });
-    } catch (error) {
-      console.error("Feedback generation failed:", error);
-      toast.error(
-        error instanceof Error && error.message.includes('API key') 
-          ? "API-sleutel niet geconfigureerd. Contacteer je docent."
-          : "Fout bij genereren van feedback. Probeer het opnieuw.",
-        { id: "feedback-generation" }
-      );
-      // Restore token on error
-      setFeedbackTokens((prev) => prev + 1);
-    }
+    setFeedback(generatedFeedback);
+    toast.success("Voorbeeldfeedback gegenereerd op basis van de beoordelingscriteria.");
   };
 
   const dismissFeedback = (id: string) => {
     setFeedback(feedback.filter(f => f.id !== id));
   };
 
-  const downloadPDF = async () => {
-    if (!text.trim()) {
-      toast.error("Schrijf eerst wat tekst voordat je een PDF downloadt");
-      return;
-    }
-
-    if (!assignmentData || !code) {
-      toast.error("Opdrachtgegevens ontbreken");
-      return;
-    }
-
-    setIsGeneratingPDF(true);
-    toast.loading("PDF wordt gegenereerd...", { id: "pdf-generation" });
-
-    try {
-      let aiReflection: string | undefined;
-
-      // Generate AI reflection if feedback was used
-      if (hasRequestedFeedbackOnce && firstFeedbackVersion) {
-        try {
-          aiReflection = await generateAIReflection(
-            firstFeedbackVersion,
-            text,
-            assignmentData.criteria.map(c => ({
-              label: c.label,
-              description: c.description
-            })),
-            assignmentData.aiConfig || null
-          );
-        } catch (error) {
-          console.error("Failed to generate AI reflection:", error);
-          // Continue without AI reflection
-        }
-      }
-
-      await generatePDF({
-        code,
-        level: assignmentData.level,
-        assignmentText: assignmentData.assignmentText,
-        criteria: assignmentData.criteria.map(c => ({
-          label: c.label,
-          description: c.description
-        })),
-        firstFeedbackVersion,
-        finalText: text,
-        hasRequestedFeedbackOnce,
-        copyPasteTriggered,
-        sessionStartTime,
-        aiReflection,
-      });
-
-      setHasDownloaded(true);
-      toast.success("PDF succesvol gedownload!", { id: "pdf-generation" });
-    } catch (error) {
-      console.error("PDF generation failed:", error);
-      toast.error("Fout bij genereren van PDF", { id: "pdf-generation" });
-    } finally {
-      setIsGeneratingPDF(false);
-    }
+  const downloadPDF = () => {
+    // In production, this would generate and download an actual PDF
+    toast.success("PDF wordt gegenereerd...");
+    setHasDownloaded(true);
+    
+    setTimeout(() => {
+      toast.success("PDF gedownload!");
+    }, 1500);
   };
 
   const wordProgress = (wordCount / 1000) * 100;
@@ -371,7 +309,6 @@ const StudentWorkspace = () => {
                   placeholder="Begin hier met schrijven..."
                   value={text}
                   onChange={(e) => handleTextChange(e.target.value)}
-                  onPaste={() => setCopyPasteTriggered(true)}
                   className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
 
@@ -440,10 +377,9 @@ const StudentWorkspace = () => {
                     onClick={downloadPDF}
                     variant="outline"
                     className="flex-1"
-                    disabled={isGeneratingPDF || !text.trim()}
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    {isGeneratingPDF ? "Bezig..." : "Afronden & Downloaden"}
+                    Download PDF
                   </Button>
                 </div>
               </CardContent>

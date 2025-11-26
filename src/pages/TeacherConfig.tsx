@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Plus, Sparkles, Copy, Check, Settings } from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Copy, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getGroupedCriteria, masterCriteria } from "@/data/masterCriteria";
@@ -24,7 +23,6 @@ type Criterion = {
 
 const TeacherConfig = () => {
   const navigate = useNavigate();
-  const [hasAiConfig, setHasAiConfig] = useState(false);
   const [level, setLevel] = useState<string>("");
   const [assignmentText, setAssignmentText] = useState("");
   const [studentCount, setStudentCount] = useState("");
@@ -34,21 +32,9 @@ const TeacherConfig = () => {
   const [generatedLinks, setGeneratedLinks] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // Check if AI config exists
-  useEffect(() => {
-    const configStr = localStorage.getItem("ai_config");
-    setHasAiConfig(!!configStr);
-  }, []);
-
   const handleAnalyze = async () => {
     if (!level || !assignmentText) {
       toast.error("Selecteer een niveau en voer een opdrachttekst in");
-      return;
-    }
-
-    if (!hasAiConfig) {
-      toast.error("Configureer eerst je AI-instellingen om deze functie te gebruiken");
-      navigate("/teacher/ai-setup");
       return;
     }
 
@@ -123,10 +109,6 @@ const TeacherConfig = () => {
     const links = Array.from({ length: count }, (_, i) => {
       const code = Math.random().toString(36).substring(2, 10).toUpperCase();
       
-      // Get AI config to include with assignment
-      const aiConfigStr = localStorage.getItem("ai_config");
-      const aiConfig = aiConfigStr ? JSON.parse(aiConfigStr) : null;
-      
       // Store assignment data in localStorage for this code
       const assignmentData = {
         level,
@@ -137,9 +119,7 @@ const TeacherConfig = () => {
           description: c.description,
           isAiSuggestion: c.isAiSuggestion,
           isCustom: c.isCustom
-        })),
-        // Include AI config so students can use AI features
-        aiConfig: aiConfig
+        }))
       };
       const key = `assignment_${code}`;
       console.log("TeacherConfig - Storing with key:", key);
@@ -170,41 +150,15 @@ const TeacherConfig = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/teacher/ai-setup")}
-          >
-            <Settings className="mr-2 h-4 w-4" />
-            AI-instellingen
-          </Button>
-        </div>
-
-        {/* AI Config Warning */}
-        {!hasAiConfig && (
-          <Alert className="border-yellow-500/50 bg-yellow-500/10">
-            <AlertDescription className="flex items-center justify-between">
-              <span>
-                AI-functies zijn uitgeschakeld. Configureer je OpenRouter API-key om AI-feedback te gebruiken.
-              </span>
-              <Button
-                size="sm"
-                onClick={() => navigate("/teacher/ai-setup")}
-              >
-                Configureer nu
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div>
+          <div>
             <h1 className="text-3xl font-bold">Opdracht Configuratie</h1>
             <p className="text-muted-foreground">Stel je schrijfopdracht samen met AI-ondersteuning</p>
           </div>
+        </div>
 
         <div className="grid gap-6">
           <Card>
