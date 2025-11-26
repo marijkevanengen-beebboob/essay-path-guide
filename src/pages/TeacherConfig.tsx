@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,43 @@ const TeacherConfig = () => {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [generatedLinks, setGeneratedLinks] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+
+  // Check if AI is configured on mount
+  useEffect(() => {
+    const checkAiConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ai_config')
+          .select('id')
+          .eq('id', 1)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error checking AI config:', error);
+          setAiConfigured(false);
+          return;
+        }
+
+        setAiConfigured(!!data);
+
+        // If not configured, redirect to setup after a short delay
+        if (!data) {
+          toast.info("AI moet eerst geconfigureerd worden", {
+            description: "Je wordt doorgestuurd naar de instellingen..."
+          });
+          setTimeout(() => {
+            navigate('/teacher-ai-setup');
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Error in checkAiConfig:', error);
+        setAiConfigured(false);
+      }
+    };
+
+    checkAiConfig();
+  }, [navigate]);
 
   const handleAnalyze = async () => {
     if (!level || !assignmentText) {
@@ -168,6 +205,22 @@ const TeacherConfig = () => {
     navigator.clipboard.writeText(allLinks);
     toast.success("Alle links gekopieerd naar klembord");
   };
+
+  // Show loading state while checking AI config
+  if (aiConfigured === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+              <p className="text-center text-muted-foreground">Configuratie controleren...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8">
