@@ -368,7 +368,9 @@ const StudentWorkspace = () => {
           </Card>
         )}
 
-        <div className="space-y-4">
+        <div className="flex gap-6 items-start">
+          {/* Left Column - Writing Area */}
+          <div className="flex-1 space-y-4">
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -397,80 +399,6 @@ const StudentWorkspace = () => {
                   className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
 
-                {checklistResults.length > 0 && (
-                  <Collapsible open={checklistOpen} onOpenChange={setChecklistOpen}>
-                    <Card className="border-2 border-primary/20 mt-4">
-                      <CollapsibleTrigger className="w-full">
-                        <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
-                          <CardTitle className="text-base flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="w-4 h-4" />
-                              Checklist
-                            </div>
-                            <ChevronDown className={`w-4 h-4 transition-transform ${checklistOpen ? 'rotate-180' : ''}`} />
-                          </CardTitle>
-                        </CardHeader>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <CardContent className="space-y-1">
-                          {checklistResults.map((item) => (
-                            <div key={item.id} className="group">
-                              <div
-                                className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
-                                onClick={() => setActiveChecklistId(activeChecklistId === item.id ? null : item.id)}
-                                onMouseEnter={() => setActiveChecklistId(item.id)}
-                                onMouseLeave={() => setActiveChecklistId(null)}
-                              >
-                                <div className="flex-shrink-0">
-                                  {item.met ? (
-                                    <CheckCircle className="w-4 h-4 text-green-600" />
-                                  ) : (
-                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                                  )}
-                                </div>
-                                <p className="text-sm flex-1">
-                                  {item.label}
-                                </p>
-                              </div>
-                              {activeChecklistId === item.id && (
-                                <p className="text-xs text-muted-foreground ml-6 px-2 py-1 bg-muted/30 rounded-sm mt-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                                  {item.explanation}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </CardContent>
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                )}
-
-                {feedback.length > 0 && (
-                  <Card className="border-2 border-primary/20 mt-4">
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        Feedback
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {feedback.map((item) => (
-                        <Alert key={item.id} className="bg-muted/30">
-                          <AlertDescription className="space-y-2">
-                            <div className="font-semibold text-sm">📍 {item.location}</div>
-                            <div className="text-sm">
-                              <span className="font-medium">Probleem:</span> {item.problem}
-                            </div>
-                            <div className="text-sm">
-                              <span className="font-medium">Advies:</span> {item.advice}
-                            </div>
-                          </AlertDescription>
-                        </Alert>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-
                 <div className="flex gap-2">
                   <Button
                     onClick={requestFeedback}
@@ -491,7 +419,110 @@ const StudentWorkspace = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
 
+          {/* Right Column - Checklist & Feedback */}
+          <div className="w-96 space-y-4 sticky top-4">
+            {checklistResults.length > 0 && (
+              <Collapsible open={checklistOpen} onOpenChange={setChecklistOpen}>
+                <Card className="border-2 border-primary/20">
+                  <CollapsibleTrigger className="w-full">
+                    <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <CardTitle className="text-base flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          Checklist
+                        </div>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${checklistOpen ? 'rotate-180' : ''}`} />
+                      </CardTitle>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="space-y-1">
+                      {checklistResults.map((item) => (
+                        <div key={item.id} className="group">
+                          <div
+                            className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => setActiveChecklistId(activeChecklistId === item.id ? null : item.id)}
+                            onMouseEnter={() => setActiveChecklistId(item.id)}
+                            onMouseLeave={() => setActiveChecklistId(null)}
+                          >
+                            <div className="flex-shrink-0">
+                              {item.met ? (
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                              )}
+                            </div>
+                            <p className="text-sm flex-1">
+                              {item.label}
+                            </p>
+                          </div>
+                          {activeChecklistId === item.id && (
+                            <p className="text-xs text-muted-foreground ml-6 px-2 py-1 bg-muted/30 rounded-sm mt-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                              {item.explanation}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            )}
+
+            {feedback.length > 0 && (
+              <Card className="border-2 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Feedback
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {feedback.map((item) => (
+                    <Alert key={item.id} className="bg-muted/30">
+                      <AlertDescription className="space-y-3">
+                        <div>
+                          <div className="font-semibold text-sm mb-1">📍 {item.location}</div>
+                          <div className="text-sm mb-2">
+                            <span className="font-medium">Probleem:</span> {item.problem}
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium">Advies:</span> {item.advice}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-2 border-t">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => {
+                              setFeedback(prev => prev.filter(f => f.id !== item.id));
+                              toast.success("Feedback geaccepteerd");
+                            }}
+                            className="flex-1"
+                          >
+                            Accepteren
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setFeedback(prev => prev.filter(f => f.id !== item.id));
+                              toast.message("Feedback genegeerd");
+                            }}
+                            className="flex-1"
+                          >
+                            Negeren
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>
