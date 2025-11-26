@@ -43,6 +43,11 @@ const StudentWorkspace = () => {
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
+  
+  // PDF generation tracking states
+  const [firstFeedbackVersion, setFirstFeedbackVersion] = useState<string>("");
+  const [hasRequestedFeedbackOnce, setHasRequestedFeedbackOnce] = useState(false);
+  const [copyPasteTriggered, setCopyPasteTriggered] = useState(false);
 
   const activeFeedback = feedback.find(f => f.id === activeFeedbackId) || null;
 
@@ -147,7 +152,7 @@ const StudentWorkspace = () => {
     return segments;
   };
 
-  const requestFeedback = () => {
+  const requestFeedback = async () => {
     if (feedbackTokens === 0) {
       toast.error("Geen feedback-kansen meer beschikbaar");
       return;
@@ -163,45 +168,58 @@ const StudentWorkspace = () => {
       return;
     }
 
-    const criteria = assignmentData.criteria;
-    const textLength = text.length;
-
-    if (textLength === 0) {
-      toast.error("Er is geen tekst om feedback op te geven");
-      return;
+    // Track first feedback request for PDF
+    if (!hasRequestedFeedbackOnce) {
+      setFirstFeedbackVersion(text);
+      setHasRequestedFeedbackOnce(true);
     }
 
     setFeedbackTokens((prev) => prev - 1);
 
-    // Simpele demo-logica:
-    // Verdeel de tekst in stukken en koppel elk criterium aan een segment,
-    // zodat we ranges hebben om te highlighten.
-    const maxCriteria = Math.min(criteria.length, 5);
-    const windowSize = Math.max(40, Math.floor(textLength / (maxCriteria || 1) / 2));
-
-    const generatedFeedback: FeedbackItem[] = criteria.slice(0, maxCriteria).map((criterion, index) => {
-      const center = Math.floor((textLength / (maxCriteria + 1)) * (index + 1));
-      let start = Math.max(0, center - windowSize);
-      let end = Math.min(textLength, center + windowSize);
-
-      if (start >= end) {
-        start = 0;
-        end = Math.min(textLength, windowSize);
-      }
-
-      const type: FeedbackItem["type"] = "content"; // voor nu altijd "content"
-
-      return {
-        id: String(index + 1),
-        range: { start, end },
-        color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-        type,
-        hint: `Feedback bij criterium "${criterion.label}": ${criterion.description}`,
-      };
+    // Show loading state
+    const loadingToast = toast.info("AI analyseert je tekst...", {
+      description: "Dit kan enkele seconden duren"
     });
 
-    setFeedback(generatedFeedback);
-    toast.success("Voorbeeldfeedback gegenereerd op basis van de beoordelingscriteria.");
+    try {
+      // Call the secure edge function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          assignmentText: assignmentData.assignmentText,
+          level: assignmentData.level,
+          criteria: assignmentData.criteria
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Fout bij ophalen van feedback');
+      }
+
+      const generatedFeedback: FeedbackItem[] = await response.json();
+
+      if (!Array.isArray(generatedFeedback) || generatedFeedback.length === 0) {
+        toast.error("Geen feedback ontvangen. Probeer het opnieuw.");
+        return;
+      }
+
+      setFeedback(generatedFeedback);
+      toast.success(`${generatedFeedback.length} feedbackpunten ontvangen!`);
+
+    } catch (error) {
+      console.error('Error requesting feedback:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Onbekende fout';
+      toast.error("Fout bij ophalen van feedback", {
+        description: errorMessage
+      });
+      // Refund the token on error
+      setFeedbackTokens((prev) => prev + 1);
+    }
   };
 
   const dismissFeedback = (id: string) => {
