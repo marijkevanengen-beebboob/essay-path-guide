@@ -11,6 +11,7 @@ import { ArrowLeft, Plus, Sparkles, Copy, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getGroupedCriteria, masterCriteria } from "@/data/masterCriteria";
+import { supabase } from "@/integrations/supabase/client";
 
 type Criterion = {
   id: string;
@@ -38,8 +39,7 @@ const TeacherConfig = () => {
       return;
     }
 
-    // Simulate AI analysis - in production this would call the backend
-    toast.success("AI analyseert de opdracht...");
+    toast.info("AI analyseert de opdracht...");
     
     // Get grouped criteria for selected level
     const groupedCriteria = getGroupedCriteria(level);
@@ -62,13 +62,35 @@ const TeacherConfig = () => {
       });
     });
     
-    // Mock AI suggestions based on assignment text (also selected by default)
-    const mockAiSuggestions: Criterion[] = [
-      { id: "ai1", label: "Onderbouwing van standpunt", description: "Specifiek voor dit type opdracht", selected: true, isAiSuggestion: true },
-      { id: "ai2", label: "Gebruik van voorbeelden", description: "Concrete voorbeelden ter ondersteuning", selected: true, isAiSuggestion: true },
-    ];
-    
-    setCriteria([...allCriteria, ...mockAiSuggestions]);
+    // Call AI to get suggestions
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-ai-suggestions', {
+        body: { assignmentText, level }
+      });
+
+      if (error) {
+        console.error('AI error:', error);
+        toast.error("AI-analyse niet beschikbaar. Ga naar AI-instellingen om te configureren.");
+        setCriteria(allCriteria);
+        return;
+      }
+
+      const aiSuggestions: Criterion[] = data.suggestions.map((suggestion: any, index: number) => ({
+        id: `ai${index + 1}`,
+        label: suggestion.label,
+        description: suggestion.description,
+        selected: true,
+        isAiSuggestion: true,
+        isCustom: false,
+      }));
+
+      setCriteria([...allCriteria, ...aiSuggestions]);
+      toast.success(`${aiSuggestions.length} AI-suggesties toegevoegd!`);
+    } catch (error) {
+      console.error('Error calling AI:', error);
+      toast.error("Fout bij AI-analyse");
+      setCriteria(allCriteria);
+    }
   };
 
   const toggleCriterion = (id: string) => {
