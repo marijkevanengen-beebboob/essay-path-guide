@@ -47,6 +47,15 @@ export const RichTextEditor = ({
   disabled = false,
 }: RichTextEditorProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Sync scroll between textarea and overlay
+  const handleScroll = () => {
+    if (textareaRef.current && overlayRef.current) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+      overlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
 
   // Render overlay with underlines
   const renderOverlay = () => {
@@ -114,6 +123,7 @@ export const RichTextEditor = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onPaste={onPaste}
+        onScroll={handleScroll}
         placeholder={placeholder}
         disabled={disabled}
         className={cn(
@@ -123,6 +133,7 @@ export const RichTextEditor = ({
       />
       {feedbackItems.length > 0 && (
         <div
+          ref={overlayRef}
           className="absolute inset-0 px-3 py-2 pointer-events-none overflow-hidden"
           style={{
             fontSize: "inherit",
