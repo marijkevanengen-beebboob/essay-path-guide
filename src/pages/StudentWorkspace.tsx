@@ -29,6 +29,15 @@ type FeedbackItem = {
   color: string;
   type: "spelling" | "grammar" | "structure" | "content";
   hint: string;
+  criterionLabel?: string;
+  sentenceIndex?: number;
+};
+
+type ChecklistResult = {
+  id: string;
+  label: string;
+  met: boolean;
+  explanation: string;
 };
 
 const StudentWorkspace = () => {
@@ -40,6 +49,8 @@ const StudentWorkspace = () => {
   const [wordCount, setWordCount] = useState(0);
   const [feedbackTokens, setFeedbackTokens] = useState(3);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [checklistResults, setChecklistResults] = useState<ChecklistResult[]>([]);
+  const [previousFeedback, setPreviousFeedback] = useState<FeedbackItem[]>([]);
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
@@ -186,10 +197,13 @@ const StudentWorkspace = () => {
       setHasRequestedFeedbackOnce(true);
     }
 
+    // Calculate current round (3 tokens = round 1, 2 tokens = round 2, 1 token = round 3)
+    const currentRound = 4 - feedbackTokens;
+    
     setFeedbackTokens((prev) => prev - 1);
 
     // Show loading state
-    const loadingToast = toast.info("AI analyseert je tekst...", {
+    const loadingToast = toast.info(`AI analyseert je tekst... (Ronde ${currentRound}/3)`, {
       description: "Dit kan enkele seconden duren"
     });
 
@@ -204,7 +218,13 @@ const StudentWorkspace = () => {
           text,
           assignmentText: assignmentData.assignmentText,
           level: assignmentData.level,
-          criteria: assignmentData.criteria
+          criteria: assignmentData.criteria,
+          round: currentRound,
+          previousFeedback: previousFeedback.map(f => ({
+            sentenceIndex: f.sentenceIndex,
+            criterionLabel: f.criterionLabel,
+            hint: f.hint
+          }))
         }),
       });
 
@@ -213,17 +233,34 @@ const StudentWorkspace = () => {
         throw new Error(errorData.error || 'Fout bij ophalen van feedback');
       }
 
-      const generatedFeedback: FeedbackItem[] = await response.json();
+      const responseData = await response.json();
 
-      if (!Array.isArray(generatedFeedback) || generatedFeedback.length === 0) {
-        toast.error("Geen feedback ontvangen. Probeer het opnieuw.");
-        return;
+      // Handle round 1 response (with checklist)
+      if (currentRound === 1 && responseData.checklistResults) {
+        setChecklistResults(responseData.checklistResults);
+        const newFeedback = responseData.feedbackItems || [];
+        setFeedback(newFeedback);
+        setPreviousFeedback(newFeedback);
+        
+        toast.success(`Checklist + ${newFeedback.length} feedbackpunten ontvangen!`, {
+          description: "Scroll naar beneden om de resultaten te zien"
+        });
+      } else {
+        // Round 2 or 3
+        const newFeedback = responseData.feedbackItems || [];
+        setFeedback(newFeedback);
+        setPreviousFeedback([...previousFeedback, ...newFeedback]);
+
+        if (newFeedback.length === 0) {
+          toast.info("Geen nieuwe verbeterpunten meer", {
+            description: "De belangrijkste punten zijn al benoemd"
+          });
+        } else {
+          toast.success(`${newFeedback.length} nieuwe feedbackpunten!`, {
+            description: "Scroll naar beneden om de gemarkeerde tekst te zien"
+          });
+        }
       }
-
-      setFeedback(generatedFeedback);
-      toast.success(`${generatedFeedback.length} feedbackpunten ontvangen!`, {
-        description: "Scroll naar beneden om de gemarkeerde tekst te zien"
-      });
       
       // Auto-scroll to highlighted text after a short delay
       setTimeout(() => {
@@ -425,6 +462,50 @@ const StudentWorkspace = () => {
                   className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
 
+                {checklistResults.length > 0 && (
+                  <div className="mt-6 space-y-3">
+                    <Card className="border-2 border-primary/30 shadow-lg">
+                      <CardHeader className="bg-primary/5">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5 text-primary" />
+                          Opdracht-checklist
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          De AI heeft bekeken of je tekst aan de minimumeisen uit de opdracht voldoet:
+                        </p>
+                      </CardHeader>
+                      <CardContent className="pt-6">
+                        <div className="space-y-3">
+                          {checklistResults.map((item) => (
+                            <div 
+                              key={item.id} 
+                              className={`p-4 rounded-lg border-2 ${
+                                item.met 
+                                  ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' 
+                                  : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5">
+                                  {item.met ? (
+                                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                  ) : (
+                                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm mb-1">{item.label}</p>
+                                  <p className="text-sm text-muted-foreground">{item.explanation}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
                 {feedback.length > 0 && (
                   <div className="mt-6 space-y-3 highlighted-text-section">
                     <Alert className="bg-primary/5 border-primary/20">
@@ -496,7 +577,7 @@ const StudentWorkspace = () => {
                     className="flex-1"
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Vraag Feedback ({feedbackTokens})
+                    Vraag Feedback ({feedbackTokens === 0 ? "0 - Geen meer beschikbaar" : `${feedbackTokens}/3`})
                   </Button>
                   <Button
                     onClick={downloadPDF}

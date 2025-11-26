@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, assignmentText, level, criteria } = await req.json();
+    const { text, assignmentText, level, criteria, round = 1, previousFeedback = [] } = await req.json();
 
     // Input validation
     if (!text || !text.trim()) {
@@ -72,87 +72,157 @@ serve(async (req) => {
     // Build numbered sentence list for AI
     const numberedSentences = sentences.map((s, i) => `ZIN ${i}: ${s.text}`).join('\n');
 
-    // Build the system prompt
-    const systemPrompt = `Je bent een ervaren docent Nederlands in het voortgezet onderwijs.
-Je beoordeelt leerlingteksten op basis van:
-1. De exacte opdrachtformulering van de docent (primaire lens)
-2. De expliciete beoordelingscriteria die zijn meegegeven
+    // Separate checklist criteria from other criteria
+    const checklistCriteria = criteria.filter((c: any) => c.origin === "assignment");
+    const otherCriteria = criteria.filter((c: any) => c.origin !== "assignment");
 
-Je denkt eerst heel precies na over wat de opdracht van de docent vraagt, en gebruikt dat als belangrijkste referentiepunt.
-Daarna leg je de uitvoering van de opdracht naast de beoordelingscriteria.
-Je schrijft in helder, bondig Nederlands.
-Je geeft alleen feedbackpunten die aanleiding geven tot concrete verbetering (iets dat de leerling anders kan doen in de tekst).
+    // Build the system prompt based on round
+    const systemPrompt = round === 1 
+      ? `Je bent een ervaren docent Nederlands in het voortgezet onderwijs.
 
-DENKSTAPPEN (beschreven voor interne analyse, output blijft JSON):
+RONDE 1: OPDRACHT-CHECKLIST + INHOUDELIJKE FEEDBACK
 
+In de eerste feedbackronde geef je TWEE soorten feedback:
+
+A) OPDRACHT-CHECKLIST BEOORDELING:
+Je krijgt een lijst "Opdracht-checklist" met minimumeisen uit de opdracht.
+Voor elk item bepaal je: is dit in de huidige tekst aanwezig (MET) of niet (NIET MET)?
+Geef per item een korte, concrete uitleg (max 1 zin) waarom wel/niet.
+
+B) INHOUDELIJKE VERBETERPUNTEN (max 5):
+Op basis van de overige beoordelingscriteria geef je maximaal 5 concrete verbeterpunten.
+Deze zijn gekoppeld aan tekstfragmenten (zinsnummers) en criteria.
+
+DENKSTAPPEN:
 1. ANALYSEER DE OPDRACHT VAN DE DOCENT:
-   - Wat is het doel van de opdracht? (betoog, beschouwing, samenvatting, brief, column, etc.)
-   - Voor wie lijkt de tekst bedoeld? (doelgroep)
-   - Welke expliciete eisen lees je in de opdracht? (standpunt innemen, aantal argumenten, brongebruik, voor-/nadelen, etc.)
-   - Vat de opdracht kort samen in eigen woorden (intern)
+   - Wat is het doel? (betoog, beschouwing, brief, etc.)
+   - Voor wie? (doelgroep)
+   - Welke expliciete eisen? (standpunt, argumenten, bronnen, etc.)
 
 2. ANALYSEER DE STRUCTUUR VAN DE LEERLINGTEKST:
-   - Neem aan dat de EERSTE REGEL de titel is (als die daar logisch staat)
-   - De INLEIDING begint in de eerste alinea NÁ de titel
-   - Splits de tekst in alinea's (op lege regels)
-   - Bepaal: welke alinea is inleiding, welke horen bij middenstuk, welke bij slot?
-   - BELANGRIJK: Gebruik de titel alleen als titel, NIET als bewijs dat de leerling "het onderwerp in de inleiding noemt"
+   - Eerste regel = titel (indien aanwezig)
+   - Inleiding begint in eerste alinea na titel
+   - Splits in alinea's
+   - Bepaal: inleiding, middenstuk, slot
 
-3. LEG DE LEERLINGTEKST NAAST DE OPDRACHT:
-   - In hoeverre voert de tekst de opdracht uit?
-   - Waar wijkt de tekst het meest af van wat de opdracht vraagt?
+3. BEOORDEEL OPDRACHT-CHECKLIST:
+   - Loop elk checklist-item af
+   - Is dit aanwezig in de tekst? Ja/Nee
+   - Korte uitleg (1 zin)
 
-4. LEG DE TEKST LANGS DE BEOORDELINGSCRITERIA:
-   - Kijk per criterium: waar wijkt de tekst het duidelijkst af?
+4. KIES MAXIMAAL 5 BELANGRIJKSTE VERBETERPUNTEN:
+   - Alleen punten waar leerling iets aan kan veranderen
+   - Concrete acties (voeg toe, herformuleer, verplaats, etc.)
+   - Geen pure complimenten
+   - Verwijs naar zinsnummers (ZIN 0, ZIN 1, etc.)
 
-5. KIES MAXIMAAL 5 BELANGRIJKSTE VERBETERPUNTEN:
-   - Kies alleen punten waar de leerling echt iets aan kan veranderen
-   - Combineer opdracht + criterium in je beoordeling
-   - Geef geen pure complimenten; koppel positieve punten aan verdere verbetering
-   - Elke hint moet een concrete actie bevatten (voeg toe, schrap, herformuleer, verplaats, etc.)
-
-BELANGRIJK:
-- Verwijs naar zinnen via hun zinsnummer (ZIN 0, ZIN 1, etc.)
-- Elk feedbackpunt verwijst impliciet of expliciet naar de docentopdracht
-- Elk feedbackpunt is gekoppeld aan één beoordelingscriterium
-- Type moet "spelling", "grammar", "structure" of "content" zijn
-- Antwoord ALLEEN in puur JSON zonder extra tekst
-
-Je antwoord MOET een JSON object zijn met deze EXACTE structuur:
+Je antwoord MOET deze EXACTE JSON-structuur hebben:
 {
-  "feedback": [
+  "checklistResults": [
+    {
+      "id": "chk_id",
+      "label": "Label van checklist-item",
+      "met": true,
+      "explanation": "Korte uitleg waarom dit wel/niet is voldaan"
+    }
+  ],
+  "feedbackItems": [
     {
       "sentenceIndex": 0,
       "type": "content",
-      "criterionLabel": "Naam van het criterium uit de lijst",
-      "hint": "Korte, heldere uitleg wat de leerling kan verbeteren"
+      "criterionLabel": "Naam criterium uit lijst",
+      "hint": "Concrete verbetertip"
     }
   ]
-}`;
+}`
+      : `Je bent een ervaren docent Nederlands in het voortgezet onderwijs.
 
-    const userPrompt = `OPDRACHT VAN DE DOCENT:
+RONDE ${round}: NIEUWE INHOUDELIJKE FEEDBACK
+
+Dit is feedbackronde ${round} van 3. De leerling heeft eerder al feedback ontvangen.
+
+KRITISCHE REGEL: Geef ALLEEN feedback op punten die je NIET eerder hebt benoemd.
+- Herhaal GEEN feedback op dezelfde zin/hetzelfde criterium als in eerdere rondes
+- Kies nieuwe, andere verbeterpunten
+- Als er weinig nieuwe punten zijn: geef minder dan 5 items (of zelfs 0)
+
+DENKSTAPPEN:
+1. ANALYSEER DE OPDRACHT VAN DE DOCENT:
+   - Wat is het doel en wat vraagt de opdracht?
+
+2. ANALYSEER DE STRUCTUUR VAN DE LEERLINGTEKST:
+   - Eerste regel = titel
+   - Inleiding, middenstuk, slot
+
+3. VERGELIJK MET EERDERE FEEDBACK:
+   - Welke zinnen/criteria zijn AL behandeld?
+   - Welke verbeterpunten zijn NOG NIET benoemd?
+
+4. KIES MAXIMAAL 5 NIEUWE VERBETERPUNTEN:
+   - Alleen punten die NIET in eerdere rondes zijn gegeven
+   - Concrete acties
+   - Als er weinig nieuwe punten zijn: geef minder items
+
+Je antwoord MOET deze EXACTE JSON-structuur hebben:
+{
+  "feedbackItems": [
+    {
+      "sentenceIndex": 0,
+      "type": "content",
+      "criterionLabel": "Naam criterium",
+      "hint": "Concrete verbetertip"
+    }
+  ]
+}
+
+BELANGRIJK: Als er nauwelijks nieuwe verbeterpunten zijn, retourneer een lege array []`;
+
+    const userPrompt = round === 1
+      ? `OPDRACHT VAN DE DOCENT:
 ${assignmentText || "Geen specifieke opdracht gegeven"}
 
 REFERENTIENIVEAU: ${level}
 
-BEOORDELINGSCRITERIA (gebruik ALLEEN deze criteria):
-${criteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
+OPDRACHT-CHECKLIST (beoordeel per item: aanwezig/niet aanwezig):
+${checklistCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
+
+OVERIGE BEOORDELINGSCRITERIA (voor inhoudelijke feedback):
+${otherCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
 
 LEERLINGTEKST (genummerde zinnen):
 ${numberedSentences}
 
-INSTRUCTIE:
-Volg de denkstappen uit je system prompt:
-1. Analyseer eerst de opdracht van de docent (doel, doelgroep, expliciete eisen)
-2. Analyseer de structuur van de leerlingtekst (titel = eerste regel, inleiding begint daarna, alinea's splitsen)
-3. Leg de leerlingtekst naast de opdracht (in hoeverre wordt de opdracht uitgevoerd?)
-4. Leg de tekst langs de beoordelingscriteria (waar wijkt de tekst af?)
-5. Kies maximaal 5 belangrijkste verbeterpunten die:
-   - Verwijzen naar de opdracht EN een criterium
-   - Een concrete actie bevatten (voeg toe, herformuleer, verplaats, schrap, etc.)
-   - Geen pure complimenten zijn
+INSTRUCTIE RONDE 1:
+1. Beoordeel EERST alle Opdracht-checklist items: is elk item aanwezig in de tekst (met: true) of niet (met: false)?
+2. Geef per checklist-item een korte uitleg (max 1 zin)
+3. Kies daarna MAXIMAAL 5 inhoudelijke verbeterpunten op basis van de overige criteria
+4. Elk verbeterpunt: verwijst naar een zinsnummer en heeft een concrete actie
 
-Return alleen het JSON object met de feedback array (geen extra tekst).`;
+Return het JSON object met checklistResults én feedbackItems.`
+      : `OPDRACHT VAN DE DOCENT:
+${assignmentText || "Geen specifieke opdracht gegeven"}
+
+REFERENTIENIVEAU: ${level}
+
+BEOORDELINGSCRITERIA:
+${otherCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
+
+LEERLINGTEKST (genummerde zinnen):
+${numberedSentences}
+
+EERDERE FEEDBACK (NIET HERHALEN):
+${previousFeedback.length > 0 
+  ? previousFeedback.map((f: any) => `- ZIN ${f.sentenceIndex}: "${f.criterionLabel}" - ${f.hint}`).join('\n')
+  : 'Geen eerdere feedback'}
+
+INSTRUCTIE RONDE ${round}:
+Dit is de ${round}e feedbackronde. De leerling heeft al eerdere feedback gekregen.
+1. Vermijd HERHALING van eerdere feedback (zie lijst hierboven)
+2. Kies NIEUWE verbeterpunten op andere zinnen/criteria
+3. Maximaal 5 nieuwe items (of minder als er weinig te verbeteren overblijft)
+4. Als er nauwelijks nieuwe punten zijn: retourneer minder items of een lege array
+
+Return alleen het JSON object met feedbackItems array.`;
 
     console.log('Calling OpenRouter API with model:', config.model);
 
@@ -187,12 +257,11 @@ Return alleen het JSON object met de feedback array (geen extra tekst).`;
     const data = await response.json();
     console.log("OpenRouter response received");
 
-    let feedbackArray;
+    let parsedResponse;
     try {
       const content = data.choices[0].message.content;
       console.log("AI response content:", content);
-      const parsed = JSON.parse(content);
-      feedbackArray = parsed.feedback || (Array.isArray(parsed) ? parsed : []);
+      parsedResponse = JSON.parse(content);
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
       return new Response(
@@ -201,44 +270,74 @@ Return alleen het JSON object met de feedback array (geen extra tekst).`;
       );
     }
 
-    if (!Array.isArray(feedbackArray) || feedbackArray.length === 0) {
-      console.log("No feedback items generated");
+    // Handle round 1 (with checklist) vs other rounds
+    if (round === 1) {
+      const checklistResults = parsedResponse.checklistResults || [];
+      const feedbackArray = parsedResponse.feedbackItems || [];
+
+      // Format feedback items
+      const formattedFeedback = feedbackArray
+        .filter((item: any) => 
+          typeof item.sentenceIndex === 'number' && 
+          item.sentenceIndex >= 0 && 
+          item.sentenceIndex < sentences.length &&
+          item.criterionLabel &&
+          item.hint
+        )
+        .map((item: any, index: number) => {
+          const sentence = sentences[item.sentenceIndex];
+          return {
+            id: String(index + 1),
+            range: { start: sentence.start, end: sentence.end },
+            color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
+            type: item.type || "content",
+            criterionLabel: item.criterionLabel,
+            hint: item.hint,
+            sentenceIndex: item.sentenceIndex
+          };
+        });
+
+      console.log(`Round 1: Generated ${checklistResults.length} checklist items and ${formattedFeedback.length} feedback items`);
+
       return new Response(
-        JSON.stringify([]),
+        JSON.stringify({
+          checklistResults,
+          feedbackItems: formattedFeedback
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Round 2 or 3: only feedback items
+      const feedbackArray = parsedResponse.feedbackItems || [];
+
+      const formattedFeedback = feedbackArray
+        .filter((item: any) => 
+          typeof item.sentenceIndex === 'number' && 
+          item.sentenceIndex >= 0 && 
+          item.sentenceIndex < sentences.length &&
+          item.criterionLabel &&
+          item.hint
+        )
+        .map((item: any, index: number) => {
+          const sentence = sentences[item.sentenceIndex];
+          return {
+            id: String(index + 1),
+            range: { start: sentence.start, end: sentence.end },
+            color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
+            type: item.type || "content",
+            criterionLabel: item.criterionLabel,
+            hint: item.hint,
+            sentenceIndex: item.sentenceIndex
+          };
+        });
+
+      console.log(`Round ${round}: Generated ${formattedFeedback.length} new feedback items`);
+
+      return new Response(
+        JSON.stringify({ feedbackItems: formattedFeedback }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Map sentence indices to character ranges and format feedback
-    const formattedFeedback = feedbackArray
-      .filter((item: any) => 
-        typeof item.sentenceIndex === 'number' && 
-        item.sentenceIndex >= 0 && 
-        item.sentenceIndex < sentences.length &&
-        item.criterionLabel &&
-        item.hint
-      )
-      .map((item: any, index: number) => {
-        const sentence = sentences[item.sentenceIndex];
-        return {
-          id: String(index + 1),
-          range: {
-            start: sentence.start,
-            end: sentence.end
-          },
-          color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-          type: item.type || "content",
-          criterionLabel: item.criterionLabel,
-          hint: item.hint
-        };
-      });
-
-    console.log(`Generated ${formattedFeedback.length} feedback items`);
-
-    return new Response(
-      JSON.stringify(formattedFeedback),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
 
   } catch (error) {
     console.error('Error in generate-feedback:', error);
