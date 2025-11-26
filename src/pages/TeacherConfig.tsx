@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Plus, Sparkles, Copy, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { getCriteriaForLevel, masterCriteria } from "@/data/masterCriteria";
+import { getGroupedCriteria, masterCriteria } from "@/data/masterCriteria";
 
 type Criterion = {
   id: string;
@@ -41,31 +41,34 @@ const TeacherConfig = () => {
     // Simulate AI analysis - in production this would call the backend
     toast.success("AI analyseert de opdracht...");
     
-    // Get master criteria for selected level
-    const masterCriteriaForLevel = getCriteriaForLevel(level);
+    // Get grouped criteria for selected level
+    const groupedCriteria = getGroupedCriteria(level);
     
-    // Mock AI selection and suggestions - in production this would call OpenRouter API
-    // For now, randomly select some master criteria and add mock AI suggestions
-    const selectedMasterIds = masterCriteriaForLevel
-      .slice(0, Math.min(5, Math.floor(masterCriteriaForLevel.length / 2)))
-      .map(c => c.id);
+    // Create criteria list with ALL criteria selected by default
+    const allCriteria: Criterion[] = [];
     
-    const masterCriteriaList: Criterion[] = masterCriteriaForLevel.map(mc => ({
-      id: mc.id,
-      label: mc.label,
-      description: mc.description,
-      selected: selectedMasterIds.includes(mc.id),
-      isAiSuggestion: false,
-      isCustom: false,
-    }));
+    groupedCriteria.forEach(group => {
+      group.categories.forEach(category => {
+        category.criteria.forEach(criterion => {
+          allCriteria.push({
+            id: criterion.id,
+            label: criterion.label,
+            description: criterion.description,
+            selected: true, // All criteria selected by default
+            isAiSuggestion: false,
+            isCustom: false,
+          });
+        });
+      });
+    });
     
-    // Mock AI suggestions based on assignment text
+    // Mock AI suggestions based on assignment text (also selected by default)
     const mockAiSuggestions: Criterion[] = [
       { id: "ai1", label: "Onderbouwing van standpunt", description: "Specifiek voor dit type opdracht", selected: true, isAiSuggestion: true },
       { id: "ai2", label: "Gebruik van voorbeelden", description: "Concrete voorbeelden ter ondersteuning", selected: true, isAiSuggestion: true },
     ];
     
-    setCriteria([...masterCriteriaList, ...mockAiSuggestions]);
+    setCriteria([...allCriteria, ...mockAiSuggestions]);
   };
 
   const toggleCriterion = (id: string) => {
@@ -217,45 +220,129 @@ const TeacherConfig = () => {
               <CardHeader>
                 <CardTitle>Beoordelingscriteria</CardTitle>
                 <CardDescription>
-                  Selecteer criteria uit de masterlijst en AI-suggesties, of voeg eigen criteria toe
+                  Alle criteria zijn aangevinkt. Vink uit wat je niet wilt gebruiken. Voeg eigen criteria toe indien gewenst.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {criteria.map((criterion) => (
-                    <div
-                      key={criterion.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                    >
-                      <Checkbox
-                        id={criterion.id}
-                        checked={criterion.selected}
-                        onCheckedChange={() => toggleCriterion(criterion.id)}
-                      />
-                      <div className="flex-1 space-y-1">
-                        <Label
-                          htmlFor={criterion.id}
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          {criterion.label}
-                          {criterion.isAiSuggestion && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Sparkles className="w-3 h-3 mr-1" />
-                              AI Suggestie
-                            </Badge>
-                          )}
-                          {criterion.isCustom && (
-                            <Badge variant="outline" className="text-xs">
-                              Eigen
-                            </Badge>
-                          )}
-                        </Label>
-                        <p className="text-sm text-muted-foreground">{criterion.description}</p>
+              <CardContent className="space-y-6">
+                {/* Group criteria by Inhoud, Vorm, Taal */}
+                {(() => {
+                  const grouped = getGroupedCriteria(level);
+                  
+                  return grouped.map(group => {
+                    const groupCriteria = criteria.filter(c => 
+                      !c.isAiSuggestion && !c.isCustom && 
+                      group.categories.some(cat => 
+                        cat.criteria.some(mc => mc.id === c.id)
+                      )
+                    );
+                    
+                    if (groupCriteria.length === 0) return null;
+                    
+                    return (
+                      <div key={group.group} className="space-y-3">
+                        <h3 className="text-lg font-semibold text-primary border-b pb-2">
+                          {group.group}
+                        </h3>
+                        <div className="space-y-2 pl-2">
+                          {groupCriteria.map((criterion) => (
+                            <div
+                              key={criterion.id}
+                              className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                            >
+                              <Checkbox
+                                id={criterion.id}
+                                checked={criterion.selected}
+                                onCheckedChange={() => toggleCriterion(criterion.id)}
+                              />
+                              <div className="flex-1 space-y-1">
+                                <Label
+                                  htmlFor={criterion.id}
+                                  className="cursor-pointer font-medium"
+                                >
+                                  {criterion.label}
+                                </Label>
+                                <p className="text-sm text-muted-foreground">{criterion.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    );
+                  });
+                })()}
 
+                {/* AI Suggestions Section */}
+                {criteria.filter(c => c.isAiSuggestion).length > 0 && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" />
+                      AI Suggesties
+                    </h3>
+                    <div className="space-y-2 pl-2">
+                      {criteria.filter(c => c.isAiSuggestion).map((criterion) => (
+                        <div
+                          key={criterion.id}
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                        >
+                          <Checkbox
+                            id={criterion.id}
+                            checked={criterion.selected}
+                            onCheckedChange={() => toggleCriterion(criterion.id)}
+                          />
+                          <div className="flex-1 space-y-1">
+                            <Label
+                              htmlFor={criterion.id}
+                              className="flex items-center gap-2 cursor-pointer font-medium"
+                            >
+                              {criterion.label}
+                              <Badge variant="secondary" className="text-xs">
+                                AI
+                              </Badge>
+                            </Label>
+                            <p className="text-sm text-muted-foreground">{criterion.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Criteria Section */}
+                {criteria.filter(c => c.isCustom).length > 0 && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h3 className="text-lg font-semibold text-primary">
+                      Eigen Criteria
+                    </h3>
+                    <div className="space-y-2 pl-2">
+                      {criteria.filter(c => c.isCustom).map((criterion) => (
+                        <div
+                          key={criterion.id}
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                        >
+                          <Checkbox
+                            id={criterion.id}
+                            checked={criterion.selected}
+                            onCheckedChange={() => toggleCriterion(criterion.id)}
+                          />
+                          <div className="flex-1 space-y-1">
+                            <Label
+                              htmlFor={criterion.id}
+                              className="flex items-center gap-2 cursor-pointer font-medium"
+                            >
+                              {criterion.label}
+                              <Badge variant="outline" className="text-xs">
+                                Eigen
+                              </Badge>
+                            </Label>
+                            <p className="text-sm text-muted-foreground">{criterion.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Custom Criterion */}
                 <div className="pt-4 border-t">
                   {showCustomInput ? (
                     <div className="flex gap-2">
