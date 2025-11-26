@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,27 +15,63 @@ const TeacherAiSetup = () => {
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("meta-llama/llama-3.3-70b-instruct");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasExistingConfig, setHasExistingConfig] = useState(false);
+
+  // Load existing configuration on mount
+  useEffect(() => {
+    const loadExistingConfig = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('check-ai-config');
+        
+        if (!error && data?.hasConfig && data?.model) {
+          setHasExistingConfig(true);
+          setModel(data.model);
+          toast.info("Bestaande configuratie geladen");
+        }
+      } catch (error) {
+        console.error('Error loading config:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadExistingConfig();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!apiKey.trim()) {
+    // Only require API key if this is a new config or if user is trying to update it
+    if (!hasExistingConfig && !apiKey.trim()) {
       toast.error("Voer een API key in");
       return;
+    }
+
+    // If updating and no new API key provided, just update model
+    if (hasExistingConfig && !apiKey.trim()) {
+      toast.info("Model bijwerken (API key blijft ongewijzigd)...");
     }
 
     setIsSubmitting(true);
 
     try {
+      const body: any = { model };
+      if (apiKey.trim()) {
+        body.apiKey = apiKey;
+      }
+
       const { data, error } = await supabase.functions.invoke('save-ai-config', {
-        body: { apiKey, model }
+        body
       });
 
       if (error) throw error;
 
       if (data.success) {
-        toast.success("AI-configuratie succesvol opgeslagen!");
-        navigate("/teacher");
+        toast.success(hasExistingConfig ? "AI-configuratie bijgewerkt!" : "AI-configuratie succesvol opgeslagen!");
+        setHasExistingConfig(true);
+        setApiKey(""); // Clear the API key field after successful save
       } else {
         toast.error(data.message || "Fout bij opslaan");
       }
@@ -47,13 +83,44 @@ const TeacherAiSetup = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+              <p className="text-center text-muted-foreground">Configuratie laden...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">AI Configuratie</h1>
-          <p className="text-muted-foreground">Stel de AI-instellingen in voor opdracht-analyse en feedback</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">AI Configuratie</h1>
+            <p className="text-muted-foreground">
+              {hasExistingConfig ? "Beheer je AI-instellingen" : "Stel de AI-instellingen in voor opdracht-analyse en feedback"}
+            </p>
+          </div>
+          <Button variant="ghost" onClick={() => navigate("/teacher")}>
+            Terug naar opdrachten
+          </Button>
         </div>
+
+        {hasExistingConfig && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Je hebt al een AI-configuratie. Vul een nieuwe API key in om deze bij te werken, of wijzig alleen het model.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Alert>
           <Info className="h-4 w-4" />
@@ -75,25 +142,33 @@ const TeacherAiSetup = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="apiKey">OpenRouter API Key</Label>
+                <Label htmlFor="apiKey">
+                  OpenRouter API Key
+                  {hasExistingConfig && <span className="text-xs text-muted-foreground ml-2">(optioneel - alleen invullen om bij te werken)</span>}
+                </Label>
                 <Input
                   id="apiKey"
                   type="password"
-                  placeholder="sk-or-v1-..."
+                  placeholder={hasExistingConfig ? "••••••••••••••••" : "sk-or-v1-..."}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   autoComplete="off"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Nog geen API key? Maak er een aan op{" "}
-                  <a 
-                    href="https://openrouter.ai/keys" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    openrouter.ai/keys
-                  </a>
+                  {hasExistingConfig 
+                    ? "Laat leeg om de huidige API key te behouden" 
+                    : <>
+                        Nog geen API key? Maak er een aan op{" "}
+                        <a 
+                          href="https://openrouter.ai/keys" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          openrouter.ai/keys
+                        </a>
+                      </>
+                  }
                 </p>
               </div>
 
@@ -125,12 +200,17 @@ const TeacherAiSetup = () => {
 
               <div className="flex gap-2 pt-4">
                 <Button type="submit" disabled={isSubmitting} className="flex-1">
-                  {isSubmitting ? "Bezig met opslaan..." : "Opslaan & Doorgaan"}
+                  {isSubmitting 
+                    ? "Bezig met opslaan..." 
+                    : hasExistingConfig 
+                      ? "Bijwerken" 
+                      : "Opslaan & Doorgaan"
+                  }
                 </Button>
                 <Button 
                   type="button" 
                   variant="ghost" 
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate(hasExistingConfig ? "/teacher" : "/")}
                   disabled={isSubmitting}
                 >
                   Annuleren

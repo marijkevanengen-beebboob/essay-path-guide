@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const { data, error } = await supabase
       .from('ai_config')
-      .select('id')
+      .select('id, model')
       .eq('id', 1)
       .maybeSingle();
 
@@ -33,7 +33,10 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ hasConfig: !!data }),
+      JSON.stringify({ 
+        hasConfig: !!data,
+        model: data?.model || null
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
