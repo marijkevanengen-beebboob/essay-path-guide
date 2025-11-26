@@ -29,6 +29,7 @@ type AssignmentData = {
 type FeedbackItem = {
   id: string;
   location: string;
+  quote?: string;
   problem: string;
   advice: string;
   status?: 'accepted' | 'rejected' | 'open';
@@ -550,7 +551,13 @@ const StudentWorkspace = () => {
                     <Alert key={item.id} className="bg-muted/30">
                       <AlertDescription className="space-y-3">
                         <div>
-                          <div className="font-semibold text-sm mb-1">📍 {item.location}</div>
+                          <div className="font-semibold text-sm mb-2">📍 {item.location}</div>
+                          {item.quote && (
+                            <div className="bg-background/80 p-2 rounded border-l-2 border-primary/30 mb-2">
+                              <div className="text-xs text-muted-foreground mb-1">Citaat uit je tekst:</div>
+                              <div className="text-sm italic text-foreground">"{item.quote}"</div>
+                            </div>
+                          )}
                           <div className="text-sm mb-2">
                             <span className="font-medium">Probleem:</span> {item.problem}
                           </div>
