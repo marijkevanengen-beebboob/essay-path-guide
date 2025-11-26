@@ -6,18 +6,14 @@ type FeedbackItem = {
   type: "spelling" | "grammar" | "structure" | "content";
 };
 
-// Helper to get API config from localStorage
-const getAiConfig = (): { apiKey: string; model: string } | null => {
-  const configStr = localStorage.getItem("ai_config");
-  if (!configStr) return null;
-  
+// Helper to decode API config
+const decodeAiConfig = (config: { apiKey: string; model: string }): { apiKey: string; model: string } => {
   try {
-    const config = JSON.parse(configStr);
     // Decode the key (it was base64 encoded)
     const apiKey = atob(config.apiKey);
     return { apiKey, model: config.model };
   } catch {
-    return null;
+    throw new Error('Invalid AI configuration');
   }
 };
 
@@ -25,13 +21,14 @@ export async function generateFeedback(
   text: string,
   level: string,
   assignmentText: string,
-  criteria: Array<{ id: string; label: string; description: string }>
+  criteria: Array<{ id: string; label: string; description: string }>,
+  aiConfig: { apiKey: string; model: string } | null
 ): Promise<FeedbackItem[]> {
-  const config = getAiConfig();
-  
-  if (!config) {
-    throw new Error('AI-instellingen niet geconfigureerd. Ga naar de AI-instellingen pagina.');
+  if (!aiConfig) {
+    throw new Error('AI-feedback is nog niet geconfigureerd. Vraag je docent om dit in te stellen.');
   }
+  
+  const config = decodeAiConfig(aiConfig);
 
   const criteriaText = criteria.map(c => `- ${c.label}: ${c.description}`).join('\n');
 
@@ -143,14 +140,15 @@ BELANGRIJK:
 export async function generateAIReflection(
   version1: string,
   finalVersion: string,
-  criteria: Array<{ label: string; description: string }>
+  criteria: Array<{ label: string; description: string }>,
+  aiConfig: { apiKey: string; model: string } | null
 ): Promise<string> {
-  const config = getAiConfig();
-  
-  if (!config) {
+  if (!aiConfig) {
     console.warn('AI-instellingen niet geconfigureerd, skipping AI reflection');
     return '';
   }
+  
+  const config = decodeAiConfig(aiConfig);
 
   const criteriaText = criteria.map(c => `- ${c.label}: ${c.description}`).join('\n');
 
