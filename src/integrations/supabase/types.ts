@@ -14,7 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_config: {
+        Row: {
+          api_key: string
+          id: number
+          model: string
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          id?: number
+          model: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          id?: number
+          model?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
