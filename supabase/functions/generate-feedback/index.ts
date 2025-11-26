@@ -177,13 +177,12 @@ Je antwoord MOET deze EXACTE JSON-structuur hebben:
 
 BELANGRIJK: Als er nauwelijks nieuwe verbeterpunten zijn, retourneer een lege array []`;
 
-    const userPrompt = round === 1
-      ? `OPDRACHT VAN DE DOCENT:
+    const userPrompt = `OPDRACHT VAN DE DOCENT:
 ${assignmentText || "Geen specifieke opdracht gegeven"}
 
 REFERENTIENIVEAU: ${level}
 
-OPDRACHT-CHECKLIST (beoordeel per item: aanwezig/niet aanwezig):
+OPDRACHT-CHECKLIST (beoordeel per item: aanwezig/niet aanwezig in HUIDIGE tekst):
 ${checklistCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
 
 OVERIGE BEOORDELINGSCRITERIA (voor inhoudelijke feedback):
@@ -192,37 +191,19 @@ ${otherCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.descriptio
 LEERLINGTEKST (genummerde zinnen):
 ${numberedSentences}
 
-INSTRUCTIE RONDE 1:
-1. Beoordeel EERST alle Opdracht-checklist items: is elk item aanwezig in de tekst (met: true) of niet (met: false)?
-2. Geef per checklist-item een korte uitleg (max 1 zin)
-3. Kies daarna MAXIMAAL 5 inhoudelijke verbeterpunten op basis van de overige criteria
-4. Elk verbeterpunt: verwijst naar een zinsnummer en heeft een concrete actie
-
-Return het JSON object met checklistResults én feedbackItems.`
-      : `OPDRACHT VAN DE DOCENT:
-${assignmentText || "Geen specifieke opdracht gegeven"}
-
-REFERENTIENIVEAU: ${level}
-
-BEOORDELINGSCRITERIA:
-${otherCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
-
-LEERLINGTEKST (genummerde zinnen):
-${numberedSentences}
-
-EERDERE FEEDBACK (NIET HERHALEN):
+${round > 1 ? `EERDERE FEEDBACK (NIET HERHALEN):
 ${previousFeedback.length > 0 
   ? previousFeedback.map((f: any) => `- ZIN ${f.sentenceIndex}: "${f.criterionLabel}" - ${f.hint}`).join('\n')
   : 'Geen eerdere feedback'}
+` : ''}
 
 INSTRUCTIE RONDE ${round}:
-Dit is de ${round}e feedbackronde. De leerling heeft al eerdere feedback gekregen.
-1. Vermijd HERHALING van eerdere feedback (zie lijst hierboven)
-2. Kies NIEUWE verbeterpunten op andere zinnen/criteria
-3. Maximaal 5 nieuwe items (of minder als er weinig te verbeteren overblijft)
-4. Als er nauwelijks nieuwe punten zijn: retourneer minder items of een lege array
+1. Beoordeel EERST alle Opdracht-checklist items: is elk item aanwezig in de HUIDIGE tekst (met: true) of niet (met: false)?
+2. Geef per checklist-item een korte uitleg (max 1 zin)
+3. Kies daarna MAXIMAAL 5 ${round > 1 ? 'NIEUWE ' : ''}inhoudelijke verbeterpunten op basis van de overige criteria
+${round > 1 ? '4. Vermijd herhaling van eerdere feedback op dezelfde zinnen/criteria\n5. Als er weinig nieuwe punten zijn: geef minder dan 5 items' : '4. Elk verbeterpunt: verwijst naar een zinsnummer en heeft een concrete actie'}
 
-Return alleen het JSON object met feedbackItems array.`;
+Return het JSON object met checklistResults én feedbackItems.`;
 
     console.log('Calling OpenRouter API with model:', config.model);
 
@@ -270,74 +251,41 @@ Return alleen het JSON object met feedbackItems array.`;
       );
     }
 
-    // Handle round 1 (with checklist) vs other rounds
-    if (round === 1) {
-      const checklistResults = parsedResponse.checklistResults || [];
-      const feedbackArray = parsedResponse.feedbackItems || [];
+    // All rounds now return both checklist and feedback items
+    const checklistResults = parsedResponse.checklistResults || [];
+    const feedbackArray = parsedResponse.feedbackItems || [];
 
-      // Format feedback items
-      const formattedFeedback = feedbackArray
-        .filter((item: any) => 
-          typeof item.sentenceIndex === 'number' && 
-          item.sentenceIndex >= 0 && 
-          item.sentenceIndex < sentences.length &&
-          item.criterionLabel &&
-          item.hint
-        )
-        .map((item: any, index: number) => {
-          const sentence = sentences[item.sentenceIndex];
-          return {
-            id: String(index + 1),
-            range: { start: sentence.start, end: sentence.end },
-            color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-            type: item.type || "content",
-            criterionLabel: item.criterionLabel,
-            hint: item.hint,
-            sentenceIndex: item.sentenceIndex
-          };
-        });
+    // Format feedback items
+    const formattedFeedback = feedbackArray
+      .filter((item: any) => 
+        typeof item.sentenceIndex === 'number' && 
+        item.sentenceIndex >= 0 && 
+        item.sentenceIndex < sentences.length &&
+        item.criterionLabel &&
+        item.hint
+      )
+      .map((item: any, index: number) => {
+        const sentence = sentences[item.sentenceIndex];
+        return {
+          id: String(index + 1),
+          range: { start: sentence.start, end: sentence.end },
+          color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
+          type: item.type || "content",
+          criterionLabel: item.criterionLabel,
+          hint: item.hint,
+          sentenceIndex: item.sentenceIndex
+        };
+      });
 
-      console.log(`Round 1: Generated ${checklistResults.length} checklist items and ${formattedFeedback.length} feedback items`);
+    console.log(`Round ${round}: Generated ${checklistResults.length} checklist items and ${formattedFeedback.length} feedback items`);
 
-      return new Response(
-        JSON.stringify({
-          checklistResults,
-          feedbackItems: formattedFeedback
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else {
-      // Round 2 or 3: only feedback items
-      const feedbackArray = parsedResponse.feedbackItems || [];
-
-      const formattedFeedback = feedbackArray
-        .filter((item: any) => 
-          typeof item.sentenceIndex === 'number' && 
-          item.sentenceIndex >= 0 && 
-          item.sentenceIndex < sentences.length &&
-          item.criterionLabel &&
-          item.hint
-        )
-        .map((item: any, index: number) => {
-          const sentence = sentences[item.sentenceIndex];
-          return {
-            id: String(index + 1),
-            range: { start: sentence.start, end: sentence.end },
-            color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-            type: item.type || "content",
-            criterionLabel: item.criterionLabel,
-            hint: item.hint,
-            sentenceIndex: item.sentenceIndex
-          };
-        });
-
-      console.log(`Round ${round}: Generated ${formattedFeedback.length} new feedback items`);
-
-      return new Response(
-        JSON.stringify({ feedbackItems: formattedFeedback }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    return new Response(
+      JSON.stringify({
+        checklistResults,
+        feedbackItems: formattedFeedback
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('Error in generate-feedback:', error);
