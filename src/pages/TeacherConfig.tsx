@@ -150,6 +150,25 @@ const TeacherConfig = () => {
     setCriteria(criteria.map(c => c.origin === origin ? { ...c, selected: selectAll } : c));
   };
 
+  const toggleAllInCategory = (categoryName: string, selectAll: boolean) => {
+    const grouped = getGroupedCriteria(level);
+    const targetGroup = grouped.find(g => g.group === categoryName);
+    
+    if (!targetGroup) return;
+    
+    const categoryIds = new Set(
+      targetGroup.categories.flatMap(cat => 
+        cat.criteria.map(mc => mc.id)
+      )
+    );
+    
+    setCriteria(criteria.map(c => 
+      c.origin === "framework" && categoryIds.has(c.id) 
+        ? { ...c, selected: selectAll } 
+        : c
+    ));
+  };
+
   const generateLinks = () => {
     const count = parseInt(studentCount);
     if (!count || count < 1) {
@@ -467,9 +486,29 @@ const TeacherConfig = () => {
                         
                         return (
                           <div key={group.group} className="space-y-3 mt-4">
-                            <h4 className="text-base font-semibold text-foreground border-b pb-2">
-                              {group.group}
-                            </h4>
+                            <div className="flex items-center justify-between border-b pb-2">
+                              <h4 className="text-base font-semibold text-foreground">
+                                {group.group}
+                              </h4>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => toggleAllInCategory(group.group, true)}
+                                  className="text-xs"
+                                >
+                                  Alles aan
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => toggleAllInCategory(group.group, false)}
+                                  className="text-xs"
+                                >
+                                  Alles uit
+                                </Button>
+                              </div>
+                            </div>
                             <div className="space-y-2 pl-2">
                               {groupCriteria.map((criterion) => (
                                 <div
