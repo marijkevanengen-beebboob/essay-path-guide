@@ -50,9 +50,6 @@ serve(async (req) => {
       );
     }
 
-    // Provide text with character positions for AI analysis
-    const textWithLength = `LEERLINGTEKST (totaal ${text.length} karakters):\n${text}`;
-
     // Separate checklist criteria from other criteria
     const checklistCriteria = criteria.filter((c: any) => c.origin === "assignment");
     const otherCriteria = criteria.filter((c: any) => c.origin !== "assignment");
@@ -233,7 +230,8 @@ ${checklistCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.descri
 OVERIGE BEOORDELINGSCRITERIA (voor inhoudelijke feedback):
 ${otherCriteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
 
-${textWithLength}
+LEERLINGTEKST (totaal ${text.length} karakters - character ranges verwijzen naar deze exacte string):
+${text}
 
 ${round > 1 ? `EERDERE FEEDBACK (NIET HERHALEN - dit zijn de character ranges die al behandeld zijn):
 ${previousFeedback.length > 0 
@@ -245,8 +243,11 @@ INSTRUCTIE RONDE ${round}:
 1. Beoordeel EERST alle Opdracht-checklist items: is elk item aanwezig in de HUIDIGE tekst (met: true) of niet (met: false)?
 2. Geef per checklist-item een korte uitleg (max 1 zin)
 3. Kies daarna MAXIMAAL 5 ${round > 1 ? 'NIEUWE ' : ''}inhoudelijke verbeterpunten op basis van de overige criteria
-4. Elk verbeterpunt MOET:
-   - range hebben met START en END character position (0-based index in de tekst)
+4. KRITISCH: Elk verbeterpunt MOET:
+   - range hebben met START en END character position (0-based index)
+   - DEZE POSITIES VERWIJZEN ALLEEN NAAR DE PURE LEERLINGTEKST HIERBOVEN
+   - NIET naar de opdrachttekst of criteria (die zijn apart gegeven)
+   - ALLEEN naar de exacte string die de leerling heeft geschreven
    - type hebben: "spelling", "grammar", "structure" of "content"
    - criterionLabel hebben uit de bovenstaande criteria
    - hint hebben met alleen INSTRUCTIE (geen voorbeeldtekst, geen herschreven zinnen)
