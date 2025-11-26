@@ -9,7 +9,7 @@ import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle } from "lucid
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { generatePDF } from "@/lib/pdfGenerator";
-import { generateAIReflection } from "@/lib/openRouterApi";
+import { generateAIReflection, generateFeedback } from "@/lib/openRouterApi";
 
 type AssignmentCriterion = {
   id: string;
@@ -156,7 +156,7 @@ const StudentWorkspace = () => {
     return segments;
   };
 
-  const requestFeedback = () => {
+  const requestFeedback = async () => {
     if (feedbackTokens === 0) {
       toast.error("Geen feedback-kansen meer beschikbaar");
       return;
@@ -178,45 +178,39 @@ const StudentWorkspace = () => {
       setHasRequestedFeedbackOnce(true);
     }
 
-    const criteria = assignmentData.criteria;
-    const textLength = text.length;
-
-    if (textLength === 0) {
-      toast.error("Er is geen tekst om feedback op te geven");
-      return;
-    }
-
     setFeedbackTokens((prev) => prev - 1);
+    toast.loading("AI analyseert je tekst...", { id: "feedback-generation" });
 
-    // Simpele demo-logica:
-    // Verdeel de tekst in stukken en koppel elk criterium aan een segment,
-    // zodat we ranges hebben om te highlighten.
-    const maxCriteria = Math.min(criteria.length, 5);
-    const windowSize = Math.max(40, Math.floor(textLength / (maxCriteria || 1) / 2));
+    try {
+      const aiFeedback = await generateFeedback(
+        text,
+        assignmentData.level,
+        assignmentData.assignmentText,
+        assignmentData.criteria
+      );
 
-    const generatedFeedback: FeedbackItem[] = criteria.slice(0, maxCriteria).map((criterion, index) => {
-      const center = Math.floor((textLength / (maxCriteria + 1)) * (index + 1));
-      let start = Math.max(0, center - windowSize);
-      let end = Math.min(textLength, center + windowSize);
-
-      if (start >= end) {
-        start = 0;
-        end = Math.min(textLength, windowSize);
-      }
-
-      const type: FeedbackItem["type"] = "content"; // voor nu altijd "content"
-
-      return {
+      // Convert AI feedback to UI format
+      const generatedFeedback: FeedbackItem[] = aiFeedback.map((item, index) => ({
         id: String(index + 1),
-        range: { start, end },
+        range: item.range,
         color: index % 2 === 0 ? "bg-yellow-200" : "bg-blue-200",
-        type,
-        hint: `Feedback bij criterium "${criterion.label}": ${criterion.description}`,
-      };
-    });
+        type: item.type,
+        hint: `${item.criterionLabel}: ${item.hint}`,
+      }));
 
-    setFeedback(generatedFeedback);
-    toast.success("Voorbeeldfeedback gegenereerd op basis van de beoordelingscriteria.");
+      setFeedback(generatedFeedback);
+      toast.success("AI-feedback ontvangen!", { id: "feedback-generation" });
+    } catch (error) {
+      console.error("Feedback generation failed:", error);
+      toast.error(
+        error instanceof Error && error.message.includes('API key') 
+          ? "API-sleutel niet geconfigureerd. Contacteer je docent."
+          : "Fout bij genereren van feedback. Probeer het opnieuw.",
+        { id: "feedback-generation" }
+      );
+      // Restore token on error
+      setFeedbackTokens((prev) => prev + 1);
+    }
   };
 
   const dismissFeedback = (id: string) => {
