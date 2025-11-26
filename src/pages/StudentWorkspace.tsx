@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle, Shield } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -356,11 +356,28 @@ const StudentWorkspace = () => {
           </Badge>
         </div>
 
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Privacywaarschuwing:</strong> Typ geen privégegevens zoals telefoonnummers, 
-            adressen of achternamen in je tekst.
+        <Alert className="border-2 border-destructive/50 bg-destructive/5">
+          <Shield className="h-5 w-5 text-destructive" />
+          <AlertDescription className="space-y-2">
+            <div className="font-semibold text-base text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Privacy & AI-gebruik
+            </div>
+            <div className="text-sm space-y-1">
+              <p>
+                <strong>Belangrijk:</strong> Je tekst wordt geanalyseerd door een AI-systeem om je te helpen met feedback.
+              </p>
+              <p className="text-destructive font-medium">
+                Deel NOOIT persoonlijke of privacy-gevoelige informatie zoals:
+              </p>
+              <ul className="list-disc list-inside ml-2 space-y-0.5 text-muted-foreground">
+                <li>Telefoonnummers (bijv. 06-nummers)</li>
+                <li>Adressen of postcodes</li>
+                <li>Achternamen van jezelf of anderen</li>
+                <li>E-mailadressen of gebruikersnamen</li>
+                <li>Geboortedatums of BSN-nummers</li>
+              </ul>
+            </div>
           </AlertDescription>
         </Alert>
 
