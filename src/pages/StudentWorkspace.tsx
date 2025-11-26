@@ -52,6 +52,7 @@ const StudentWorkspace = () => {
   const [checklistResults, setChecklistResults] = useState<ChecklistResult[]>([]);
   const [previousFeedback, setPreviousFeedback] = useState<FeedbackItem[]>([]);
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
+  const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
   
@@ -235,31 +236,25 @@ const StudentWorkspace = () => {
 
       const responseData = await response.json();
 
-      // Handle round 1 response (with checklist)
-      if (currentRound === 1 && responseData.checklistResults) {
-        setChecklistResults(responseData.checklistResults);
-        const newFeedback = responseData.feedbackItems || [];
-        setFeedback(newFeedback);
+      // All rounds now return checklist results
+      setChecklistResults(responseData.checklistResults || []);
+      const newFeedback = responseData.feedbackItems || [];
+      setFeedback(newFeedback);
+      
+      if (currentRound === 1) {
         setPreviousFeedback(newFeedback);
-        
-        toast.success(`Checklist + ${newFeedback.length} feedbackpunten ontvangen!`, {
-          description: "Scroll naar beneden om de resultaten te zien"
+      } else {
+        setPreviousFeedback([...previousFeedback, ...newFeedback]);
+      }
+      
+      if (newFeedback.length === 0) {
+        toast.info("Checklist bijgewerkt", {
+          description: "De belangrijkste inhoudelijke punten zijn al benoemd"
         });
       } else {
-        // Round 2 or 3
-        const newFeedback = responseData.feedbackItems || [];
-        setFeedback(newFeedback);
-        setPreviousFeedback([...previousFeedback, ...newFeedback]);
-
-        if (newFeedback.length === 0) {
-          toast.info("Geen nieuwe verbeterpunten meer", {
-            description: "De belangrijkste punten zijn al benoemd"
-          });
-        } else {
-          toast.success(`${newFeedback.length} nieuwe feedbackpunten!`, {
-            description: "Scroll naar beneden om de gemarkeerde tekst te zien"
-          });
-        }
+        toast.success(`Checklist bijgewerkt + ${newFeedback.length} ${currentRound > 1 ? 'nieuwe ' : ''}feedbackpunten`, {
+          description: "Scroll naar beneden om de resultaten te zien"
+        });
       }
       
       // Auto-scroll to highlighted text after a short delay
@@ -463,47 +458,42 @@ const StudentWorkspace = () => {
                 />
 
                 {checklistResults.length > 0 && (
-                  <div className="mt-6 space-y-3">
-                    <Card className="border-2 border-primary/30 shadow-lg">
-                      <CardHeader className="bg-primary/5">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5 text-primary" />
-                          Opdracht-checklist
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          De AI heeft bekeken of je tekst aan de minimumeisen uit de opdracht voldoet:
-                        </p>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="space-y-3">
-                          {checklistResults.map((item) => (
-                            <div 
-                              key={item.id} 
-                              className={`p-4 rounded-lg border-2 ${
-                                item.met 
-                                  ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' 
-                                  : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="mt-0.5">
-                                  {item.met ? (
-                                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                                  ) : (
-                                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm mb-1">{item.label}</p>
-                                  <p className="text-sm text-muted-foreground">{item.explanation}</p>
-                                </div>
-                              </div>
+                  <Card className="border-2 border-primary/20 mt-4">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Checklist uit de opdracht
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1">
+                      {checklistResults.map((item) => (
+                        <div key={item.id} className="group">
+                          <div
+                            className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => setActiveChecklistId(activeChecklistId === item.id ? null : item.id)}
+                            onMouseEnter={() => setActiveChecklistId(item.id)}
+                            onMouseLeave={() => setActiveChecklistId(null)}
+                          >
+                            <div className="flex-shrink-0">
+                              {item.met ? (
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                              )}
                             </div>
-                          ))}
+                            <p className="text-sm flex-1">
+                              {item.label}
+                            </p>
+                          </div>
+                          {activeChecklistId === item.id && (
+                            <p className="text-xs text-muted-foreground ml-6 px-2 py-1 bg-muted/30 rounded-sm mt-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                              {item.explanation}
+                            </p>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                      ))}
+                    </CardContent>
+                  </Card>
                 )}
 
                 {feedback.length > 0 && (
