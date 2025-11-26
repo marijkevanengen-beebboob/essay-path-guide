@@ -43,28 +43,29 @@ serve(async (req) => {
     }
 
     // Call OpenRouter API
-    const prompt = `Je bent een expert in taaldidactiek en beoordelingscriteria voor het Nederlandse onderwijs.
+    const prompt = `Je bent een expert in taaldidactiek en het maken van opdracht-checklists voor het Nederlandse onderwijs.
 
-Analyseer de volgende schrijfopdracht voor niveau ${level} en geef 2-3 specifieke beoordelingscriteria die passen bij deze opdracht.
+Analyseer de volgende schrijfopdracht voor niveau ${level} en maak een checklist met minimumeisen voor de leerlingtekst.
 
 Opdracht:
 ${assignmentText}
 
-Geef de criteria terug in dit exacte JSON-formaat:
+Geef de checklist terug in dit exacte JSON-formaat:
 {
-  "suggestions": [
+  "checklist": [
     {
-      "label": "Korte naam van het criterium",
-      "description": "Concrete beschrijving wat je evalueert"
+      "label": "Korte, concrete eis (bijv. 'De tekst heeft een titel')",
+      "description": "Optionele toelichting waarom dit belangrijk is"
     }
   ]
 }
 
 Let op:
-- Maak de criteria specifiek voor deze opdracht (niet algemeen)
-- Richt je op aspecten die relevant zijn voor dit type tekst
-- Houd rekening met het niveau ${level}
-- Geef 2-3 criteria`;
+- Maak 4-6 concrete, toetsbare minimumeisen die direct uit de opdracht volgen
+- Denk aan: structuur (titel, inleiding, middenstuk, slot), minimale lengte, standpunt, argumenten, specifieke elementen die de opdracht vraagt
+- Formuleer elke eis als een concrete check die je met Ja/Nee kunt beantwoorden
+- Maak ze specifiek voor deze opdracht, niet algemeen
+- Houd rekening met het niveau ${level}`;
 
     console.log('Calling OpenRouter API with model:', config.model);
     
@@ -100,6 +101,7 @@ Let op:
     const aiResponse = data.choices[0].message.content;
     const parsedResponse = JSON.parse(aiResponse);
 
+    // Return the checklist (keep "checklist" as key for clarity)
     return new Response(
       JSON.stringify(parsedResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

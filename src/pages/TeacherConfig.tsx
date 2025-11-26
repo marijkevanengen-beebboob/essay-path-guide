@@ -18,8 +18,7 @@ type Criterion = {
   label: string;
   description: string;
   selected: boolean;
-  isAiSuggestion?: boolean;
-  isCustom?: boolean;
+  origin: "assignment" | "framework" | "custom";
 };
 
 const TeacherConfig = () => {
@@ -75,28 +74,27 @@ const TeacherConfig = () => {
 
     toast.info("AI analyseert de opdracht...");
     
-    // Get grouped criteria for selected level
+    // Get grouped criteria for selected level (framework criteria)
     const groupedCriteria = getGroupedCriteria(level);
     
-    // Create criteria list with ALL criteria selected by default
-    const allCriteria: Criterion[] = [];
+    // Create framework criteria list with ALL criteria selected by default
+    const frameworkCriteria: Criterion[] = [];
     
     groupedCriteria.forEach(group => {
       group.categories.forEach(category => {
         category.criteria.forEach(criterion => {
-          allCriteria.push({
+          frameworkCriteria.push({
             id: criterion.id,
             label: criterion.label,
             description: criterion.description,
-            selected: true, // All criteria selected by default
-            isAiSuggestion: false,
-            isCustom: false,
+            selected: true,
+            origin: "framework",
           });
         });
       });
     });
     
-    // Call AI to get suggestions
+    // Call AI to get assignment-specific checklist
     try {
       const { data, error } = await supabase.functions.invoke('generate-ai-suggestions', {
         body: { assignmentText, level }
@@ -105,25 +103,25 @@ const TeacherConfig = () => {
       if (error) {
         console.error('AI error:', error);
         toast.error("AI-analyse niet beschikbaar. Ga naar AI-instellingen om te configureren.");
-        setCriteria(allCriteria);
+        setCriteria(frameworkCriteria);
         return;
       }
 
-      const aiSuggestions: Criterion[] = data.suggestions.map((suggestion: any, index: number) => ({
-        id: `ai${index + 1}`,
-        label: suggestion.label,
-        description: suggestion.description,
+      const assignmentChecklist: Criterion[] = data.checklist.map((item: any, index: number) => ({
+        id: `assignment-${index + 1}`,
+        label: item.label,
+        description: item.description || "",
         selected: true,
-        isAiSuggestion: true,
-        isCustom: false,
+        origin: "assignment",
       }));
 
-      setCriteria([...allCriteria, ...aiSuggestions]);
-      toast.success(`${aiSuggestions.length} AI-suggesties toegevoegd!`);
+      // Combine: assignment checklist first, then framework criteria
+      setCriteria([...assignmentChecklist, ...frameworkCriteria]);
+      toast.success(`Opdracht geanalyseerd! ${assignmentChecklist.length} minimumeisen gevonden.`);
     } catch (error) {
       console.error('Error calling AI:', error);
       toast.error("Fout bij AI-analyse");
-      setCriteria(allCriteria);
+      setCriteria(frameworkCriteria);
     }
   };
 
@@ -139,13 +137,17 @@ const TeacherConfig = () => {
       label: customCriterion,
       description: "Eigen criterium",
       selected: true,
-      isCustom: true,
+      origin: "custom",
     };
     
     setCriteria([...criteria, newCriterion]);
     setCustomCriterion("");
     setShowCustomInput(false);
     toast.success("Criterium toegevoegd");
+  };
+
+  const toggleAllInSection = (origin: "assignment" | "framework" | "custom", selectAll: boolean) => {
+    setCriteria(criteria.map(c => c.origin === origin ? { ...c, selected: selectAll } : c));
   };
 
   const generateLinks = () => {
@@ -173,8 +175,7 @@ const TeacherConfig = () => {
           id: c.id,
           label: c.label,
           description: c.description,
-          isAiSuggestion: c.isAiSuggestion,
-          isCustom: c.isCustom
+          origin: c.origin
         }))
       };
       const key = `assignment_${code}`;
@@ -298,69 +299,45 @@ const TeacherConfig = () => {
               <CardHeader>
                 <CardTitle>Beoordelingscriteria</CardTitle>
                 <CardDescription>
-                  Alle criteria zijn aangevinkt. Vink uit wat je niet wilt gebruiken. Voeg eigen criteria toe indien gewenst.
+                  Alle criteria zijn aangevinkt. Vink uit wat je niet wilt gebruiken.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Group criteria by Inhoud, Vorm, Taal */}
-                {(() => {
-                  const grouped = getGroupedCriteria(level);
-                  
-                  return grouped.map(group => {
-                    const groupCriteria = criteria.filter(c => 
-                      !c.isAiSuggestion && !c.isCustom && 
-                      group.categories.some(cat => 
-                        cat.criteria.some(mc => mc.id === c.id)
-                      )
-                    );
-                    
-                    if (groupCriteria.length === 0) return null;
-                    
-                    return (
-                      <div key={group.group} className="space-y-3">
-                        <h3 className="text-lg font-semibold text-primary border-b pb-2">
-                          {group.group}
+              <CardContent className="space-y-8">
+                {/* 1. Assignment Checklist (AI-generated) */}
+                {criteria.filter(c => c.origin === "assignment").length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
+                          <Sparkles className="w-5 h-5" />
+                          Opdracht-checklist (AI)
                         </h3>
-                        <div className="space-y-2 pl-2">
-                          {groupCriteria.map((criterion) => (
-                            <div
-                              key={criterion.id}
-                              className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                            >
-                              <Checkbox
-                                id={criterion.id}
-                                checked={criterion.selected}
-                                onCheckedChange={() => toggleCriterion(criterion.id)}
-                              />
-                              <div className="flex-1 space-y-1">
-                                <Label
-                                  htmlFor={criterion.id}
-                                  className="cursor-pointer font-medium"
-                                >
-                                  {criterion.label}
-                                </Label>
-                                <p className="text-sm text-muted-foreground">{criterion.description}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Minimumeisen die uit de opdracht zijn afgeleid. Zet uit wat je niet wilt gebruiken.
+                        </p>
                       </div>
-                    );
-                  });
-                })()}
-
-                {/* AI Suggestions Section */}
-                {criteria.filter(c => c.isAiSuggestion).length > 0 && (
-                  <div className="space-y-3 pt-4 border-t">
-                    <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" />
-                      AI Suggesties
-                    </h3>
-                    <div className="space-y-2 pl-2">
-                      {criteria.filter(c => c.isAiSuggestion).map((criterion) => (
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => toggleAllInSection("assignment", true)}
+                        >
+                          Alles aan
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => toggleAllInSection("assignment", false)}
+                        >
+                          Alles uit
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {criteria.filter(c => c.origin === "assignment").map((criterion) => (
                         <div
                           key={criterion.id}
-                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                         >
                           <Checkbox
                             id={criterion.id}
@@ -370,14 +347,13 @@ const TeacherConfig = () => {
                           <div className="flex-1 space-y-1">
                             <Label
                               htmlFor={criterion.id}
-                              className="flex items-center gap-2 cursor-pointer font-medium"
+                              className="cursor-pointer font-medium"
                             >
                               {criterion.label}
-                              <Badge variant="secondary" className="text-xs">
-                                AI
-                              </Badge>
                             </Label>
-                            <p className="text-sm text-muted-foreground">{criterion.description}</p>
+                            {criterion.description && (
+                              <p className="text-sm text-muted-foreground">{criterion.description}</p>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -385,17 +361,23 @@ const TeacherConfig = () => {
                   </div>
                 )}
 
-                {/* Custom Criteria Section */}
-                {criteria.filter(c => c.isCustom).length > 0 && (
-                  <div className="space-y-3 pt-4 border-t">
+                {/* 2. Custom Criteria Section */}
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
                     <h3 className="text-lg font-semibold text-primary">
-                      Eigen Criteria
+                      Extra criteria van de docent
                     </h3>
-                    <div className="space-y-2 pl-2">
-                      {criteria.filter(c => c.isCustom).map((criterion) => (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Voeg hier je eigen criteria toe die specifiek voor deze opdracht gelden.
+                    </p>
+                  </div>
+                  
+                  {criteria.filter(c => c.origin === "custom").length > 0 && (
+                    <div className="space-y-2">
+                      {criteria.filter(c => c.origin === "custom").map((criterion) => (
                         <div
                           key={criterion.id}
-                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                         >
                           <Checkbox
                             id={criterion.id}
@@ -405,7 +387,7 @@ const TeacherConfig = () => {
                           <div className="flex-1 space-y-1">
                             <Label
                               htmlFor={criterion.id}
-                              className="flex items-center gap-2 cursor-pointer font-medium"
+                              className="cursor-pointer font-medium flex items-center gap-2"
                             >
                               {criterion.label}
                               <Badge variant="outline" className="text-xs">
@@ -417,11 +399,8 @@ const TeacherConfig = () => {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Add Custom Criterion */}
-                <div className="pt-4 border-t">
                   {showCustomInput ? (
                     <div className="flex gap-2">
                       <Input
@@ -442,6 +421,84 @@ const TeacherConfig = () => {
                     </Button>
                   )}
                 </div>
+
+                {/* 3. Framework Criteria (Reference Framework) */}
+                {criteria.filter(c => c.origin === "framework").length > 0 && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-primary">
+                          Referentiekader Schrijven – niveau {level}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Standaard criteria uit het referentiekader voor dit niveau.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => toggleAllInSection("framework", true)}
+                        >
+                          Alles aan
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => toggleAllInSection("framework", false)}
+                        >
+                          Alles uit
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {(() => {
+                      const grouped = getGroupedCriteria(level);
+                      
+                      return grouped.map(group => {
+                        const groupCriteria = criteria.filter(c => 
+                          c.origin === "framework" && 
+                          group.categories.some(cat => 
+                            cat.criteria.some(mc => mc.id === c.id)
+                          )
+                        );
+                        
+                        if (groupCriteria.length === 0) return null;
+                        
+                        return (
+                          <div key={group.group} className="space-y-3 mt-4">
+                            <h4 className="text-base font-semibold text-foreground border-b pb-2">
+                              {group.group}
+                            </h4>
+                            <div className="space-y-2 pl-2">
+                              {groupCriteria.map((criterion) => (
+                                <div
+                                  key={criterion.id}
+                                  className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                                >
+                                  <Checkbox
+                                    id={criterion.id}
+                                    checked={criterion.selected}
+                                    onCheckedChange={() => toggleCriterion(criterion.id)}
+                                  />
+                                  <div className="flex-1 space-y-1">
+                                    <Label
+                                      htmlFor={criterion.id}
+                                      className="cursor-pointer font-medium"
+                                    >
+                                      {criterion.label}
+                                    </Label>
+                                    <p className="text-sm text-muted-foreground">{criterion.description}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
