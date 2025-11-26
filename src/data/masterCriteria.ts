@@ -652,3 +652,30 @@ export const getCategorizedCriteria = (level: string): CriterionCategory[] => {
   const levelData = masterCriteria.find(l => l.level === level);
   return levelData?.categories || [];
 };
+
+// Helper function to group criteria into three main categories: Vorm, Inhoud, Taal
+export const getGroupedCriteria = (level: string): { group: string; categories: CriterionCategory[] }[] => {
+  const levelData = masterCriteria.find(l => l.level === level);
+  if (!levelData) return [];
+
+  const vormCategories = ["Leesbaarheid", "Alinea's en Structuur"];
+  const inhoudCategories = ["Samenhang", "Afstemming op Doel", "Afstemming op Publiek", "Afstemming op Doel en Publiek", "Relaties en Argumentatie", "Woordgebruik", "Woordgebruik en Woordenschat"];
+  const taalCategories = ["Taalverzorging", "Spelling en Grammatica", "Verwijs- en Verbindingswoorden"];
+
+  const grouped = [
+    {
+      group: "Inhoud",
+      categories: levelData.categories.filter(cat => inhoudCategories.includes(cat.category))
+    },
+    {
+      group: "Vorm",
+      categories: levelData.categories.filter(cat => vormCategories.includes(cat.category))
+    },
+    {
+      group: "Taal",
+      categories: levelData.categories.filter(cat => taalCategories.includes(cat.category))
+    }
+  ];
+
+  return grouped.filter(g => g.categories.length > 0);
+};
