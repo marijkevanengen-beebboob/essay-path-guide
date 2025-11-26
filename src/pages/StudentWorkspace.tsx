@@ -5,7 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle, Shield } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle, Shield, ChevronDown } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/RichTextEditor";
@@ -54,6 +55,7 @@ const StudentWorkspace = () => {
   const [previousFeedback, setPreviousFeedback] = useState<FeedbackItem[]>([]);
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
+  const [checklistOpen, setChecklistOpen] = useState(true);
   const [showExitWarning, setShowExitWarning] = useState(true);
   const [hasDownloaded, setHasDownloaded] = useState(false);
   
@@ -362,22 +364,24 @@ const StudentWorkspace = () => {
           </AlertDescription>
         </Alert>
 
-        <div className="max-w-4xl mx-auto space-y-4">
-            {assignmentData && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Opdracht</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    value={assignmentData.assignmentText}
-                    readOnly
-                    className="min-h-[100px] resize-none bg-muted/50"
-                  />
-                </CardContent>
-              </Card>
-            )}
+        {assignmentData && (
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-lg">Opdracht</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={assignmentData.assignmentText}
+                readOnly
+                className="min-h-[100px] resize-none bg-muted/50"
+              />
+            </CardContent>
+          </Card>
+        )}
 
+        <div className="flex gap-6 items-start">
+          {/* Left Column - Writing Area */}
+          <div className="flex-1 space-y-4">
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
@@ -409,86 +413,51 @@ const StudentWorkspace = () => {
                 />
 
                 {checklistResults.length > 0 && (
-                  <Card className="border-2 border-primary/20 mt-4">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        Checklist uit de opdracht
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1">
-                      {checklistResults.map((item) => (
-                        <div key={item.id} className="group">
-                          <div
-                            className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => setActiveChecklistId(activeChecklistId === item.id ? null : item.id)}
-                            onMouseEnter={() => setActiveChecklistId(item.id)}
-                            onMouseLeave={() => setActiveChecklistId(null)}
-                          >
-                            <div className="flex-shrink-0">
-                              {item.met ? (
-                                <CheckCircle className="w-4 h-4 text-green-600" />
-                              ) : (
-                                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <Collapsible open={checklistOpen} onOpenChange={setChecklistOpen}>
+                    <Card className="border-2 border-primary/20 mt-4">
+                      <CollapsibleTrigger className="w-full">
+                        <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                          <CardTitle className="text-base flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4" />
+                              Checklist uit de opdracht
+                            </div>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${checklistOpen ? 'rotate-180' : ''}`} />
+                          </CardTitle>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent className="space-y-1">
+                          {checklistResults.map((item) => (
+                            <div key={item.id} className="group">
+                              <div
+                                className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                                onClick={() => setActiveChecklistId(activeChecklistId === item.id ? null : item.id)}
+                                onMouseEnter={() => setActiveChecklistId(item.id)}
+                                onMouseLeave={() => setActiveChecklistId(null)}
+                              >
+                                <div className="flex-shrink-0">
+                                  {item.met ? (
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                  )}
+                                </div>
+                                <p className="text-sm flex-1">
+                                  {item.label}
+                                </p>
+                              </div>
+                              {activeChecklistId === item.id && (
+                                <p className="text-xs text-muted-foreground ml-6 px-2 py-1 bg-muted/30 rounded-sm mt-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-200">
+                                  {item.explanation}
+                                </p>
                               )}
                             </div>
-                            <p className="text-sm flex-1">
-                              {item.label}
-                            </p>
-                          </div>
-                          {activeChecklistId === item.id && (
-                            <p className="text-xs text-muted-foreground ml-6 px-2 py-1 bg-muted/30 rounded-sm mt-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                              {item.explanation}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-
-
-                {activeFeedback && (
-                  <div className="mt-4">
-                    <Card className="bg-card border shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-sm flex items-center justify-between">
-                          Feedback
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {activeFeedback.type}
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <p className="text-sm leading-relaxed">
-                          {activeFeedback.hint}
-                        </p>
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
-                              setActiveFeedbackId(null);
-                              toast.success("Feedback geaccepteerd");
-                            }}
-                          >
-                            Accepteren
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
-                              setActiveFeedbackId(null);
-                              toast.message("Feedback genegeerd");
-                            }}
-                          >
-                            Negeren
-                          </Button>
-                        </div>
-                      </CardContent>
+                          ))}
+                        </CardContent>
+                      </CollapsibleContent>
                     </Card>
-                  </div>
+                  </Collapsible>
                 )}
 
                 <div className="flex gap-2">
@@ -511,6 +480,58 @@ const StudentWorkspace = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Right Column - Feedback Panel */}
+          <div className="w-80 sticky top-4">
+            {activeFeedback ? (
+              <Card className="bg-card border shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    Feedback
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {activeFeedback.type}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm leading-relaxed">
+                    {activeFeedback.hint}
+                  </p>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
+                        setActiveFeedbackId(null);
+                        toast.success("Feedback geaccepteerd");
+                      }}
+                    >
+                      Accepteren
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setFeedback(prev => prev.filter(f => f.id !== activeFeedback.id));
+                        setActiveFeedbackId(null);
+                        toast.message("Feedback genegeerd");
+                      }}
+                    >
+                      Negeren
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : feedback.length > 0 ? (
+              <Card className="bg-muted/30 border-dashed">
+                <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>Klik op een onderstreept stuk tekst om de feedback te zien</p>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
