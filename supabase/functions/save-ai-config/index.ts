@@ -14,9 +14,9 @@ serve(async (req) => {
   try {
     const { apiKey, model } = await req.json();
 
-    if (!apiKey || !model) {
+    if (!model) {
       return new Response(
-        JSON.stringify({ success: false, message: 'API key en model zijn verplicht' }),
+        JSON.stringify({ success: false, message: 'Model is verplicht' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -42,15 +42,21 @@ serve(async (req) => {
       }
     }
 
+    // Prepare upsert data - only include apiKey if provided
+    const upsertData: any = {
+      id: 1,
+      model: model,
+      updated_at: new Date().toISOString()
+    };
+
+    if (apiKey) {
+      upsertData.api_key = apiKey;
+    }
+
     // Store or update the config (use a single row with id=1)
     const { error: upsertError } = await supabase
       .from('ai_config')
-      .upsert({
-        id: 1,
-        api_key: apiKey,
-        model: model,
-        updated_at: new Date().toISOString()
-      });
+      .upsert(upsertData);
 
     if (upsertError) {
       console.error('Error storing config:', upsertError);

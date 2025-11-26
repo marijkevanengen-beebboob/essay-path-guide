@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Sparkles, Copy, Check } from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Copy, Check, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { getGroupedCriteria, masterCriteria } from "@/data/masterCriteria";
@@ -222,14 +222,20 @@ const TeacherConfig = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Opdracht Configuratie</h1>
-            <p className="text-muted-foreground">Stel je schrijfopdracht samen met AI-ondersteuning</p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Opdracht Configuratie</h1>
+              <p className="text-muted-foreground">Stel je schrijfopdracht samen met AI-ondersteuning</p>
+            </div>
           </div>
+          <Button variant="outline" onClick={() => navigate("/teacher-ai-setup")} className="gap-2">
+            <Settings className="w-4 h-4" />
+            AI-instellingen
+          </Button>
         </div>
 
         <div className="grid gap-6">
