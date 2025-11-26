@@ -31,6 +31,7 @@ type FeedbackItem = {
   location: string;
   problem: string;
   advice: string;
+  status?: 'accepted' | 'rejected' | 'open';
 };
 
 type ChecklistResult = {
@@ -38,6 +39,12 @@ type ChecklistResult = {
   label: string;
   met: boolean;
   explanation: string;
+};
+
+type FeedbackRound = {
+  round: number;
+  feedback: FeedbackItem[];
+  checklist: ChecklistResult[];
 };
 
 const StudentWorkspace = () => {
@@ -51,6 +58,7 @@ const StudentWorkspace = () => {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [checklistResults, setChecklistResults] = useState<ChecklistResult[]>([]);
   const [previousFeedback, setPreviousFeedback] = useState<any[]>([]);
+  const [feedbackHistory, setFeedbackHistory] = useState<FeedbackRound[]>([]);
   const [activeChecklistId, setActiveChecklistId] = useState<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [showExitWarning, setShowExitWarning] = useState(true);
@@ -219,8 +227,19 @@ const StudentWorkspace = () => {
 
       // All rounds now return checklist results
       setChecklistResults(responseData.checklistResults || []);
-      const newFeedback = responseData.feedbackItems || [];
+      const newFeedback = (responseData.feedbackItems || []).map((item: any) => ({
+        ...item,
+        status: 'open' as const
+      }));
       setFeedback(newFeedback);
+      
+      // Store this round in history
+      const newRound: FeedbackRound = {
+        round: currentRound,
+        feedback: newFeedback,
+        checklist: responseData.checklistResults || []
+      };
+      setFeedbackHistory(prev => [...prev, newRound]);
       
       if (currentRound === 1) {
         setPreviousFeedback(newFeedback);
@@ -250,7 +269,7 @@ const StudentWorkspace = () => {
   };
 
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     // Validation
     if (!text.trim()) {
       toast.error("Schrijf eerst tekst voordat je een PDF kunt downloaden");
@@ -262,32 +281,50 @@ const StudentWorkspace = () => {
       return;
     }
 
-    toast.info("PDF wordt gegenereerd...");
+    toast.info("PDF wordt gegenereerd...", {
+      description: "AI genereert een feedbackrapport"
+    });
 
     try {
-      // Create feedback summary
       let feedbackSummary = '';
-      if (checklistResults.length > 0 || feedback.length > 0) {
-        feedbackSummary += 'Laatst ontvangen feedback:\n\n';
-        
-        if (checklistResults.length > 0) {
-          feedbackSummary += 'Checklist:\n';
-          checklistResults.forEach((item, index) => {
-            feedbackSummary += `${index + 1}. ${item.label}: ${item.met ? '✓ Voldaan' : '✗ Niet voldaan'}\n`;
-            if (item.explanation) {
-              feedbackSummary += `   ${item.explanation}\n`;
-            }
+
+      // If feedback was requested, generate AI reflection
+      if (hasRequestedFeedbackOnce && feedbackHistory.length > 0) {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-reflection`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              firstFeedbackVersion: firstFeedbackVersion || text,
+              finalText: text,
+              feedbackHistory: feedbackHistory.map(round => ({
+                round: round.round,
+                feedback: round.feedback.map(f => ({
+                  location: f.location,
+                  problem: f.problem,
+                  advice: f.advice,
+                  status: f.status || 'open'
+                }))
+              })),
+              lastChecklist: checklistResults,
+              assignmentText: assignmentData.assignmentText,
+              criteria: assignmentData.criteria,
+              level: assignmentData.level
+            }),
           });
-          feedbackSummary += '\n';
-        }
-        
-        if (feedback.length > 0) {
-          feedbackSummary += 'Verbeterpunten:\n';
-          feedback.forEach((item, index) => {
-            feedbackSummary += `${index + 1}. Locatie: ${item.location}\n`;
-            feedbackSummary += `   Probleem: ${item.problem}\n`;
-            feedbackSummary += `   Advies: ${item.advice}\n\n`;
-          });
+
+          if (response.ok) {
+            const data = await response.json();
+            feedbackSummary = data.report;
+          } else {
+            console.error('Failed to generate reflection:', await response.text());
+            feedbackSummary = 'Er is een fout opgetreden bij het genereren van het feedbackrapport. De docent kan de ontwikkeling beoordelen op basis van Versie 1 en de Eindversie.';
+          }
+        } catch (error) {
+          console.error('Error generating reflection:', error);
+          feedbackSummary = 'Er is een fout opgetreden bij het genereren van het feedbackrapport. De docent kan de ontwikkeling beoordelen op basis van Versie 1 en de Eindversie.';
         }
       }
 
@@ -526,6 +563,13 @@ const StudentWorkspace = () => {
                             size="sm"
                             variant="default"
                             onClick={() => {
+                              // Update status in feedback history
+                              setFeedbackHistory(prev => prev.map(round => ({
+                                ...round,
+                                feedback: round.feedback.map(f => 
+                                  f.id === item.id ? { ...f, status: 'accepted' as const } : f
+                                )
+                              })));
                               setFeedback(prev => prev.filter(f => f.id !== item.id));
                               toast.success("Feedback geaccepteerd");
                             }}
@@ -537,6 +581,13 @@ const StudentWorkspace = () => {
                             size="sm"
                             variant="outline"
                             onClick={() => {
+                              // Update status in feedback history
+                              setFeedbackHistory(prev => prev.map(round => ({
+                                ...round,
+                                feedback: round.feedback.map(f => 
+                                  f.id === item.id ? { ...f, status: 'rejected' as const } : f
+                                )
+                              })));
                               setFeedback(prev => prev.filter(f => f.id !== item.id));
                               toast.message("Feedback genegeerd");
                             }}
