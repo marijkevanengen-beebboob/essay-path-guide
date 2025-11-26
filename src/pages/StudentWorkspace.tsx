@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ArrowLeft, AlertTriangle, Sparkles, Download, CheckCircle, Shield, ChevronDown } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { generateStudentPDF } from "@/lib/generatePDF";
 
 
 type AssignmentCriterion = {
@@ -99,6 +100,35 @@ const StudentWorkspace = () => {
     const words = text.trim().split(/\s+/).filter(Boolean).length;
     setWordCount(words);
   }, [text]);
+
+  // Save work to localStorage
+  useEffect(() => {
+    if (code && text) {
+      localStorage.setItem(`assignment_${code}_currentText`, text);
+    }
+  }, [text, code]);
+
+  useEffect(() => {
+    if (code && firstFeedbackVersion) {
+      localStorage.setItem(`assignment_${code}_firstVersion`, firstFeedbackVersion);
+    }
+  }, [firstFeedbackVersion, code]);
+
+  // Load saved work from localStorage
+  useEffect(() => {
+    if (code) {
+      const savedText = localStorage.getItem(`assignment_${code}_currentText`);
+      const savedFirstVersion = localStorage.getItem(`assignment_${code}_firstVersion`);
+      
+      if (savedText) {
+        setText(savedText);
+      }
+      if (savedFirstVersion) {
+        setFirstFeedbackVersion(savedFirstVersion);
+        setHasRequestedFeedbackOnce(true);
+      }
+    }
+  }, [code]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -220,66 +250,65 @@ const StudentWorkspace = () => {
   };
 
 
-  const downloadPDF = async () => {
+  const downloadPDF = () => {
+    // Validation
     if (!text.trim()) {
-      toast.error("Er is geen tekst om te downloaden");
+      toast.error("Schrijf eerst tekst voordat je een PDF kunt downloaden");
       return;
     }
 
-    if (!assignmentData) {
-      toast.error("Opdracht data niet beschikbaar");
+    if (!assignmentData || !code) {
+      toast.error("Opdrachtgegevens ontbreken");
       return;
     }
 
-    toast.info("PDF wordt gegenereerd...", {
-      description: "Dit kan een paar seconden duren"
-    });
+    toast.info("PDF wordt gegenereerd...");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          assignmentData: {
-            level: assignmentData.level,
-            assignmentText: assignmentData.assignmentText,
-            criteria: assignmentData.criteria
-          },
-          firstFeedbackVersion: firstFeedbackVersion || "",
-          hasRequestedFeedbackOnce,
-          copyPasteTriggered,
-          finalText: text,
-          code: code || "UNKNOWN"
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fout bij genereren van PDF');
+      // Create feedback summary
+      let feedbackSummary = '';
+      if (checklistResults.length > 0 || feedback.length > 0) {
+        feedbackSummary += 'Laatst ontvangen feedback:\n\n';
+        
+        if (checklistResults.length > 0) {
+          feedbackSummary += 'Checklist:\n';
+          checklistResults.forEach((item, index) => {
+            feedbackSummary += `${index + 1}. ${item.label}: ${item.met ? '✓ Voldaan' : '✗ Niet voldaan'}\n`;
+            if (item.explanation) {
+              feedbackSummary += `   ${item.explanation}\n`;
+            }
+          });
+          feedbackSummary += '\n';
+        }
+        
+        if (feedback.length > 0) {
+          feedbackSummary += 'Verbeterpunten:\n';
+          feedback.forEach((item, index) => {
+            feedbackSummary += `${index + 1}. Locatie: ${item.location}\n`;
+            feedbackSummary += `   Probleem: ${item.problem}\n`;
+            feedbackSummary += `   Advies: ${item.advice}\n\n`;
+          });
+        }
       }
 
-      // Get the PDF blob
-      const blob = await response.blob();
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `opdracht-${code}-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Generate PDF
+      generateStudentPDF({
+        code: code,
+        level: assignmentData.level,
+        assignmentText: assignmentData.assignmentText,
+        firstFeedbackVersion: firstFeedbackVersion || "",
+        finalText: text,
+        hasRequestedFeedbackOnce,
+        feedbackSummary: feedbackSummary || undefined
+      });
 
       setHasDownloaded(true);
       toast.success("PDF succesvol gedownload!");
 
     } catch (error) {
-      console.error('Error downloading PDF:', error);
+      console.error('Error generating PDF:', error);
       const errorMessage = error instanceof Error ? error.message : 'Onbekende fout';
-      toast.error("Fout bij downloaden van PDF", {
+      toast.error("Fout bij genereren van PDF", {
         description: errorMessage
       });
     }
