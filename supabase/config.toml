@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.generate-feedback]
 verify_jwt = false
+
+[functions.check-ai-config]
+verify_jwt = false
