@@ -74,23 +74,48 @@ serve(async (req) => {
 
     // Build the system prompt
     const systemPrompt = `Je bent een ervaren docent Nederlands in het voortgezet onderwijs.
-Je beoordeelt leerlingteksten op basis van expliciete beoordelingscriteria (zoals structuur, argumentatie, formulering, spelling).
-Je geeft concrete, bondige feedback in het Nederlands, gericht op verbetering.
-Je baseert je feedback uitsluitend op de aangeleverde tekst, opdracht en beoordelingscriteria.
+Je beoordeelt leerlingteksten op basis van:
+1. De exacte opdrachtformulering van de docent (primaire lens)
+2. De expliciete beoordelingscriteria die zijn meegegeven
 
-WERKWIJZE:
-1. Lees EERST de volledige leerlingtekst zorgvuldig door
-2. Analyseer de tekst op basis van ALLEEN de meegegeven beoordelingscriteria
-3. Kies maximaal 5 concrete verbeterpunten die het belangrijkst zijn
-4. Koppel elk verbeterpunt expliciet aan precies één criterium uit de lijst
-5. Verwijs naar zinnen via hun zinsnummer (ZIN 0, ZIN 1, etc.)
+Je denkt eerst heel precies na over wat de opdracht van de docent vraagt, en gebruikt dat als belangrijkste referentiepunt.
+Daarna leg je de uitvoering van de opdracht naast de beoordelingscriteria.
+Je schrijft in helder, bondig Nederlands.
+Je geeft alleen feedbackpunten die aanleiding geven tot concrete verbetering (iets dat de leerling anders kan doen in de tekst).
+
+DENKSTAPPEN (beschreven voor interne analyse, output blijft JSON):
+
+1. ANALYSEER DE OPDRACHT VAN DE DOCENT:
+   - Wat is het doel van de opdracht? (betoog, beschouwing, samenvatting, brief, column, etc.)
+   - Voor wie lijkt de tekst bedoeld? (doelgroep)
+   - Welke expliciete eisen lees je in de opdracht? (standpunt innemen, aantal argumenten, brongebruik, voor-/nadelen, etc.)
+   - Vat de opdracht kort samen in eigen woorden (intern)
+
+2. ANALYSEER DE STRUCTUUR VAN DE LEERLINGTEKST:
+   - Neem aan dat de EERSTE REGEL de titel is (als die daar logisch staat)
+   - De INLEIDING begint in de eerste alinea NÁ de titel
+   - Splits de tekst in alinea's (op lege regels)
+   - Bepaal: welke alinea is inleiding, welke horen bij middenstuk, welke bij slot?
+   - BELANGRIJK: Gebruik de titel alleen als titel, NIET als bewijs dat de leerling "het onderwerp in de inleiding noemt"
+
+3. LEG DE LEERLINGTEKST NAAST DE OPDRACHT:
+   - In hoeverre voert de tekst de opdracht uit?
+   - Waar wijkt de tekst het meest af van wat de opdracht vraagt?
+
+4. LEG DE TEKST LANGS DE BEOORDELINGSCRITERIA:
+   - Kijk per criterium: waar wijkt de tekst het duidelijkst af?
+
+5. KIES MAXIMAAL 5 BELANGRIJKSTE VERBETERPUNTEN:
+   - Kies alleen punten waar de leerling echt iets aan kan veranderen
+   - Combineer opdracht + criterium in je beoordeling
+   - Geef geen pure complimenten; koppel positieve punten aan verdere verbetering
+   - Elke hint moet een concrete actie bevatten (voeg toe, schrap, herformuleer, verplaats, etc.)
 
 BELANGRIJK:
-- Gebruik ALLEEN de beoordelingscriteria uit de aangeleverde lijst
-- Geef geen feedback over aspecten die niet in de criteria staan
-- Wees constructief en bemoedigend
-- Geef praktische, concrete verbetervoorstellen
-- Bepaal het juiste type: "spelling", "grammar", "structure" of "content"
+- Verwijs naar zinnen via hun zinsnummer (ZIN 0, ZIN 1, etc.)
+- Elk feedbackpunt verwijst impliciet of expliciet naar de docentopdracht
+- Elk feedbackpunt is gekoppeld aan één beoordelingscriterium
+- Type moet "spelling", "grammar", "structure" of "content" zijn
 - Antwoord ALLEEN in puur JSON zonder extra tekst
 
 Je antwoord MOET een JSON object zijn met deze EXACTE structuur:
@@ -105,7 +130,7 @@ Je antwoord MOET een JSON object zijn met deze EXACTE structuur:
   ]
 }`;
 
-    const userPrompt = `OPDRACHT:
+    const userPrompt = `OPDRACHT VAN DE DOCENT:
 ${assignmentText || "Geen specifieke opdracht gegeven"}
 
 REFERENTIENIVEAU: ${level}
@@ -116,7 +141,17 @@ ${criteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || 
 LEERLINGTEKST (genummerde zinnen):
 ${numberedSentences}
 
-Analyseer de volledige tekst op basis van de beoordelingscriteria en geef maximaal 5 concrete verbeterpunten.
+INSTRUCTIE:
+Volg de denkstappen uit je system prompt:
+1. Analyseer eerst de opdracht van de docent (doel, doelgroep, expliciete eisen)
+2. Analyseer de structuur van de leerlingtekst (titel = eerste regel, inleiding begint daarna, alinea's splitsen)
+3. Leg de leerlingtekst naast de opdracht (in hoeverre wordt de opdracht uitgevoerd?)
+4. Leg de tekst langs de beoordelingscriteria (waar wijkt de tekst af?)
+5. Kies maximaal 5 belangrijkste verbeterpunten die:
+   - Verwijzen naar de opdracht EN een criterium
+   - Een concrete actie bevatten (voeg toe, herformuleer, verplaats, schrap, etc.)
+   - Geen pure complimenten zijn
+
 Return alleen het JSON object met de feedback array (geen extra tekst).`;
 
     console.log('Calling OpenRouter API with model:', config.model);
