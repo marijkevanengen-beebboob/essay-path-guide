@@ -310,32 +310,42 @@ const TeacherConfig = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {generatedLinks.map((link, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                    >
-                      <a 
-                        href={link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-sm flex-1 truncate text-primary hover:underline"
+                  {generatedLinks.map((link, index) => {
+                    const code = link.split('/').pop() || '';
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                       >
-                        {link}
-                      </a>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => copyToClipboard(link, index)}
-                      >
-                        {copiedIndex === index ? (
-                          <Check className="w-4 h-4 text-success" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="flex-1 space-y-1">
+                          <a 
+                            href={link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-sm block truncate text-primary hover:underline"
+                          >
+                            {link}
+                          </a>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs">
+                              Code: {code}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => copyToClipboard(link, index)}
+                        >
+                          {copiedIndex === index ? (
+                            <Check className="w-4 h-4 text-success" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
