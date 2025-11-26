@@ -38,11 +38,7 @@ const TeacherConfig = () => {
   useEffect(() => {
     const checkAiConfig = async () => {
       try {
-        const { data, error } = await supabase
-          .from('ai_config')
-          .select('id')
-          .eq('id', 1)
-          .maybeSingle();
+        const { data, error } = await supabase.functions.invoke('check-ai-config');
 
         if (error) {
           console.error('Error checking AI config:', error);
@@ -50,10 +46,11 @@ const TeacherConfig = () => {
           return;
         }
 
-        setAiConfigured(!!data);
+        const hasConfig = data?.hasConfig ?? false;
+        setAiConfigured(hasConfig);
 
         // If not configured, redirect to setup after a short delay
-        if (!data) {
+        if (!hasConfig) {
           toast.info("AI moet eerst geconfigureerd worden", {
             description: "Je wordt doorgestuurd naar de instellingen..."
           });
