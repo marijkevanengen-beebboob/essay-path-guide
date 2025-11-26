@@ -1,4 +1,6 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,14 +30,23 @@ serve(async (req) => {
       );
     }
 
-    // Get API key from environment (server-side only)
-    const apiKey = Deno.env.get("OPENROUTER_API_KEY");
-    
-    if (!apiKey) {
-      console.error("OPENROUTER_API_KEY not configured");
+    // Get AI config from database (same as generate-ai-suggestions)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: config, error: configError } = await supabase
+      .from('ai_config')
+      .select('api_key, model')
+      .eq('id', 1)
+      .single();
+
+    if (configError || !config) {
+      console.error('Config error:', configError);
       return new Response(
-        JSON.stringify({ error: 'AI-feedback is nog niet geconfigureerd. Vraag je docent om dit in te stellen.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'AI-configuratie niet gevonden. Vraag je docent om de AI-instellingen te configureren.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -47,7 +58,7 @@ Je krijgt een opdracht, een leerlingtekst en specifieke beoordelingscriteria.
 Je taak:
 1. Analyseer de tekst op basis van de gegeven criteria
 2. Vind 2-5 specifieke tekstsegmenten die aandacht nodig hebben
-3. Voor elk segment, geef het start- en eindkarakter positie in de tekst
+3. Voor elk segment, geef het start- en eindkarakter positie in de tekst (let op: tel vanaf 0)
 4. Geef constructieve, beknopte feedback
 
 BELANGRIJK:
@@ -55,16 +66,19 @@ BELANGRIJK:
 - Wees constructief en bemoedigend
 - Focus op de criteria die de docent heeft ingesteld
 - Geef praktische verbetervoorstellen
+- Bepaal het juiste type: "spelling", "grammar", "structure" of "content"
 
-Je antwoord MOET een JSON array zijn met deze structuur:
-[
-  {
-    "range": { "start": 14, "end": 47 },
-    "type": "content",
-    "criterionLabel": "Criterium naam",
-    "hint": "Feedback tekst hier"
-  }
-]`;
+Je antwoord MOET een JSON object zijn met deze EXACTE structuur:
+{
+  "feedback": [
+    {
+      "range": { "start": 14, "end": 47 },
+      "type": "content",
+      "criterionLabel": "Criterium naam",
+      "hint": "Feedback tekst hier"
+    }
+  ]
+}`;
 
     const userPrompt = `OPDRACHT:
 ${assignmentText || "Geen specifieke opdracht gegeven"}
@@ -75,19 +89,21 @@ ${text}
 BEOORDELINGSCRITERIA:
 ${criteria.map((c: any, i: number) => `${i + 1}. ${c.label}: ${c.description || ''}`).join('\n')}
 
-Analyseer de tekst en geef 2-5 stukken feedback. Return alleen de JSON array, geen andere tekst.`;
+Analyseer de tekst en geef 2-5 stukken feedback. Return alleen het JSON object met de feedback array.`;
 
-    console.log("Calling OpenRouter API...");
+    console.log('Calling OpenRouter API with model:', config.model);
 
-    // Call OpenRouter API
+    // Call OpenRouter API with the configured model
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${config.api_key}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://punt-app.lovable.app",
+        "X-Title": "PUNT! Schrijfomgeving"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp:free",
+        model: config.model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -111,13 +127,22 @@ Analyseer de tekst en geef 2-5 stukken feedback. Return alleen de JSON array, ge
     let feedbackArray;
     try {
       const content = data.choices[0].message.content;
+      console.log("AI response content:", content);
       const parsed = JSON.parse(content);
-      feedbackArray = Array.isArray(parsed) ? parsed : (parsed.feedback || []);
+      feedbackArray = parsed.feedback || (Array.isArray(parsed) ? parsed : []);
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
       return new Response(
         JSON.stringify({ error: 'Fout bij verwerken van AI-antwoord' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!Array.isArray(feedbackArray) || feedbackArray.length === 0) {
+      console.log("No feedback items generated");
+      return new Response(
+        JSON.stringify([]),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
