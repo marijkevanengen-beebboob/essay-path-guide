@@ -14,7 +14,7 @@ const Index = () => {
             PUNT!
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
-            Een intelligente schrijfomgeving voor leerlingen, door docenten. Zo simpel is het.
+            Een intelligente schrijfomgeving voor leerlingen, door docenten.<br />Zo simpel is het.
           </p>
         </div>
 
