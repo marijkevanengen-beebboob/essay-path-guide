@@ -6,16 +6,31 @@ type FeedbackItem = {
   type: "spelling" | "grammar" | "structure" | "content";
 };
 
+// Helper to get API config from localStorage
+const getAiConfig = (): { apiKey: string; model: string } | null => {
+  const configStr = localStorage.getItem("ai_config");
+  if (!configStr) return null;
+  
+  try {
+    const config = JSON.parse(configStr);
+    // Decode the key (it was base64 encoded)
+    const apiKey = atob(config.apiKey);
+    return { apiKey, model: config.model };
+  } catch {
+    return null;
+  }
+};
+
 export async function generateFeedback(
   text: string,
   level: string,
   assignmentText: string,
   criteria: Array<{ id: string; label: string; description: string }>
 ): Promise<FeedbackItem[]> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  const config = getAiConfig();
   
-  if (!apiKey) {
-    throw new Error('OpenRouter API key not configured. Set VITE_OPENROUTER_API_KEY in your environment.');
+  if (!config) {
+    throw new Error('AI-instellingen niet geconfigureerd. Ga naar de AI-instellingen pagina.');
   }
 
   const criteriaText = criteria.map(c => `- ${c.label}: ${c.description}`).join('\n');
@@ -58,12 +73,12 @@ BELANGRIJK:
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': window.location.origin,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: config.model,
         messages: [
           {
             role: 'user',
@@ -130,10 +145,10 @@ export async function generateAIReflection(
   finalVersion: string,
   criteria: Array<{ label: string; description: string }>
 ): Promise<string> {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+  const config = getAiConfig();
   
-  if (!apiKey) {
-    console.warn('OpenRouter API key not found, skipping AI reflection');
+  if (!config) {
+    console.warn('AI-instellingen niet geconfigureerd, skipping AI reflection');
     return '';
   }
 
@@ -156,12 +171,12 @@ Geef een bondige, bemoedigende analyse van de belangrijkste verbeteringen. Focus
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': window.location.origin,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
+        model: config.model,
         messages: [
           {
             role: 'user',
