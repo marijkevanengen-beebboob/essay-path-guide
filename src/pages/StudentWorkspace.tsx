@@ -110,6 +110,16 @@ const StudentWorkspace = () => {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pastedText = e.clipboardData.getData('text');
+    const wordCount = pastedText.trim().split(/\s+/).filter(Boolean).length;
+    
+    if (wordCount > 50) {
+      setCopyPasteTriggered(true);
+      console.log('Large paste detected:', wordCount, 'words');
+    }
+  };
+
   const getHighlightedText = (text: string, feedbackItems: FeedbackItem[]) => {
     if (!feedbackItems || feedbackItems.length === 0) return text;
 
@@ -131,7 +141,9 @@ const StudentWorkspace = () => {
       segments.push(
         <span
           key={`hl-${item.id}`}
-          className={`${item.color} rounded-sm cursor-pointer hover:opacity-80 transition-opacity`}
+          className={`${item.color} rounded-sm cursor-pointer hover:opacity-70 transition-all px-1 py-0.5 font-medium border-b-2 border-current ${
+            activeFeedbackId === item.id ? 'ring-2 ring-primary ring-offset-2' : ''
+          }`}
           onClick={() => setActiveFeedbackId(item.id)}
         >
           {text.slice(start, end)}
@@ -209,7 +221,17 @@ const StudentWorkspace = () => {
       }
 
       setFeedback(generatedFeedback);
-      toast.success(`${generatedFeedback.length} feedbackpunten ontvangen!`);
+      toast.success(`${generatedFeedback.length} feedbackpunten ontvangen!`, {
+        description: "Scroll naar beneden om de gemarkeerde tekst te zien"
+      });
+      
+      // Auto-scroll to highlighted text after a short delay
+      setTimeout(() => {
+        const highlightedSection = document.querySelector('.highlighted-text-section');
+        if (highlightedSection) {
+          highlightedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 500);
 
     } catch (error) {
       console.error('Error requesting feedback:', error);
@@ -226,14 +248,69 @@ const StudentWorkspace = () => {
     setFeedback(feedback.filter(f => f.id !== id));
   };
 
-  const downloadPDF = () => {
-    // In production, this would generate and download an actual PDF
-    toast.success("PDF wordt gegenereerd...");
-    setHasDownloaded(true);
-    
-    setTimeout(() => {
-      toast.success("PDF gedownload!");
-    }, 1500);
+  const downloadPDF = async () => {
+    if (!text.trim()) {
+      toast.error("Er is geen tekst om te downloaden");
+      return;
+    }
+
+    if (!assignmentData) {
+      toast.error("Opdracht data niet beschikbaar");
+      return;
+    }
+
+    toast.info("PDF wordt gegenereerd...", {
+      description: "Dit kan een paar seconden duren"
+    });
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignmentData: {
+            level: assignmentData.level,
+            assignmentText: assignmentData.assignmentText,
+            criteria: assignmentData.criteria
+          },
+          firstFeedbackVersion: firstFeedbackVersion || "",
+          hasRequestedFeedbackOnce,
+          copyPasteTriggered,
+          finalText: text,
+          code: code || "UNKNOWN"
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Fout bij genereren van PDF');
+      }
+
+      // Get the PDF blob
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `opdracht-${code}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setHasDownloaded(true);
+      toast.success("PDF succesvol gedownload!");
+
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Onbekende fout';
+      toast.error("Fout bij downloaden van PDF", {
+        description: errorMessage
+      });
+    }
   };
 
   const wordProgress = (wordCount / 1000) * 100;
@@ -327,14 +404,27 @@ const StudentWorkspace = () => {
                   placeholder="Begin hier met schrijven..."
                   value={text}
                   onChange={(e) => handleTextChange(e.target.value)}
+                  onPaste={handlePaste}
                   className="min-h-[500px] font-serif text-base leading-relaxed resize-none"
                 />
 
                 {feedback.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <h3 className="text-sm font-medium">Gemarkeerde tekst (klik op markering voor feedback)</h3>
-                    <div className="p-3 rounded-md border bg-muted/40 whitespace-pre-wrap font-serif text-base leading-relaxed">
-                      {getHighlightedText(text, feedback)}
+                  <div className="mt-6 space-y-3 highlighted-text-section">
+                    <Alert className="bg-primary/5 border-primary/20">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <AlertDescription>
+                        <strong>{feedback.length} feedback punten gevonden!</strong> Klik op de gekleurde markeringen hieronder om de feedback te lezen.
+                      </AlertDescription>
+                    </Alert>
+                    <div className="relative">
+                      <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <span className="inline-block w-3 h-3 bg-yellow-200 rounded"></span>
+                        <span className="inline-block w-3 h-3 bg-blue-200 rounded"></span>
+                        Gemarkeerde tekst
+                      </h3>
+                      <div className="p-4 rounded-lg border-2 border-primary/20 bg-card shadow-sm whitespace-pre-wrap font-serif text-base leading-relaxed">
+                        {getHighlightedText(text, feedback)}
+                      </div>
                     </div>
                   </div>
                 )}
